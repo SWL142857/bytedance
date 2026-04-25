@@ -19,6 +19,16 @@ const DETERMINISTIC_RESPONSES: Record<string, string> = {
     fairnessFlags: [],
     talentPoolSignal: null,
   }),
+  interview_kit_v1: JSON.stringify({
+    questions: [
+      { question: "Walk me through how you would design a recommendation system for a new product line.", purpose: "Assess technical depth and ML pipeline understanding", followUps: ["How would you handle cold start?", "What metrics would you track?"] },
+      { question: "Describe a time when you had to prioritize competing features with limited engineering resources.", purpose: "Evaluate product sense and prioritization skills", followUps: ["What tradeoffs did you make?", "How did you communicate the decision?"] },
+      { question: "Present a technical spec you wrote to a non-technical stakeholder - how do you structure it?", purpose: "Test communication clarity", followUps: ["How do you handle pushback?", "What format works best?"] },
+    ],
+    scorecardDimensions: ["technical_depth", "product_sense", "communication"],
+    focusAreas: ["ML system design", "feature prioritization", "cross-functional collaboration"],
+    riskChecks: ["Check for over-reliance on single metric", "Verify hands-on vs advisory experience split"],
+  }),
 };
 
 export class DeterministicLlmClient implements LlmClient {
