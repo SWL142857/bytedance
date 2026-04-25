@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "base:plan": "node --import tsx scripts/plan-base.ts",
     "base:seed:dry-run": "node --import tsx scripts/seed-base.ts",
-    "base:seed:execute": "node --import tsx scripts/seed-base.ts --execute"
+    "base:seed:execute": "node --import tsx scripts/seed-base.ts --execute",
+    "pipeline:demo": "node --import tsx scripts/demo-pipeline.ts"
   },
   "keywords": [
     "recruitment",

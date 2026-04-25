@@ -1,5 +1,11 @@
 import type { ScreeningRecommendation, Confidence, FactType } from "../types/index.ts";
 
+export interface HrCoordinatorOutput {
+  handoffSummary: string;
+  nextStep: "human_decision";
+  coordinatorChecklist: string[];
+}
+
 export interface ResumeParserOutput {
   facts: Array<{
     factType: FactType;
@@ -269,4 +275,26 @@ export function parseInterviewKitOutput(value: unknown): InterviewKitOutput {
     focusAreas: parsedFocusAreas,
     riskChecks: parsedRiskChecks,
   };
+}
+
+// --- HR Coordinator ---
+
+const HR_COORDINATOR_ALLOWED_KEYS = new Set([
+  "handoffSummary", "nextStep", "coordinatorChecklist",
+]);
+
+export function parseHrCoordinatorOutput(value: unknown): HrCoordinatorOutput {
+  if (!isObject(value)) throw new SchemaValidationError("HrCoordinatorOutput must be an object");
+  const forbidden = hasForbiddenKeys(value);
+  if (forbidden) throw new SchemaValidationError(`Forbidden key "${forbidden}" in HrCoordinatorOutput`);
+  for (const key of Object.keys(value)) {
+    if (!HR_COORDINATOR_ALLOWED_KEYS.has(key)) {
+      throw new SchemaValidationError(`Unknown key "${key}" in HrCoordinatorOutput`);
+    }
+  }
+  const { handoffSummary, nextStep, coordinatorChecklist } = value;
+  if (!isString(handoffSummary)) throw new SchemaValidationError("handoffSummary must be a string");
+  if (nextStep !== "human_decision") throw new SchemaValidationError(`nextStep must be "human_decision", got "${String(nextStep)}"`);
+  const parsedChecklist = parseStringArray(coordinatorChecklist, "coordinatorChecklist");
+  return { handoffSummary, nextStep, coordinatorChecklist: parsedChecklist };
 }

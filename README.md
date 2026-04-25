@@ -58,7 +58,7 @@ lark-cli `+record-upsert` 不支持按业务字段自动查重；没有 `--recor
 
 当前查询 helpers（`listCandidatesForStatusFilter` 等）不做服务端过滤，只生成 `+record-list` 分页读取命令。小规模 MVP 可在客户端过滤返回结果；数据规模增大后应改用预置视图 `--view-id` 或 data-query 接口。
 
-当前 deterministic local agents 已覆盖 Resume Parser（new → parsed）、Screening（parsed → screened）、Interview Kit（screened → interview_kit_ready），前三段自动流程均可在无外部 API 的环境下通过测试验证。
+当前 deterministic local agents 已覆盖 Resume Parser（new → parsed）、Screening（parsed → screened）、Interview Kit（screened → interview_kit_ready）、HR Coordinator（interview_kit_ready → decision_pending），完整的自动主链路可在无外部 API 的环境下通过 `pnpm pipeline:demo` 验证。当前 demo pipeline 只生成 command plan，不做真实 Base 写入。
 
 ## 运行方式
 

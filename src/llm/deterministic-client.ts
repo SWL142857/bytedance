@@ -29,6 +29,16 @@ const DETERMINISTIC_RESPONSES: Record<string, string> = {
     focusAreas: ["ML system design", "feature prioritization", "cross-functional collaboration"],
     riskChecks: ["Check for over-reliance on single metric", "Verify hands-on vs advisory experience split"],
   }),
+  hr_coordinator_v1: JSON.stringify({
+    handoffSummary: "Candidate shows strong technical depth and product sense. Communication rated medium. Interview kit prepared with 3 targeted questions.",
+    nextStep: "human_decision",
+    coordinatorChecklist: [
+      "Review interview kit questions for role alignment",
+      "Confirm interview panel availability",
+      "Check candidate screening recommendation",
+      "Schedule follow-up with hiring manager",
+    ],
+  }),
 };
 
 export class DeterministicLlmClient implements LlmClient {
