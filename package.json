@@ -5,8 +5,8 @@
   "description": "AI-powered recruitment assistant built on Lark Base",
   "scripts": {
     "build": "tsc",
-    "test": "node --import tsx --test src/**/*.test.ts tests/**/*.test.ts",
-    "test:watch": "node --import tsx --test --watch src/**/*.test.ts tests/**/*.test.ts",
+    "test": "node --import tsx --test \"src/**/*.test.ts\" \"tests/**/*.test.ts\"",
+    "test:watch": "node --import tsx --test --watch \"src/**/*.test.ts\" \"tests/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
     "base:plan": "node --import tsx scripts/plan-base.ts",
     "base:seed:dry-run": "node --import tsx scripts/seed-base.ts",
