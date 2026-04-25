@@ -18,6 +18,10 @@ dist/
 # OS
 .DS_Store
 Thumbs.db
+CLAUDE.md
+docs/prompts/
+docs/implementation/
+docs/superpowers/
 
 # Logs
 *.log
