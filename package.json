@@ -1,0 +1,29 @@
+{
+  "name": "hireloop",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "AI-powered recruitment assistant built on Lark Base",
+  "scripts": {
+    "build": "tsc",
+    "test": "node --import tsx --test src/**/*.test.ts tests/**/*.test.ts",
+    "test:watch": "node --import tsx --test --watch src/**/*.test.ts tests/**/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "recruitment",
+    "ai",
+    "lark",
+    "feishu",
+    "hr"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
