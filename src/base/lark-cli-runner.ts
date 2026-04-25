@@ -186,3 +186,84 @@ function runCommands(
     blocked: false,
   };
 }
+
+export class OutputParseError extends Error {
+  constructor(message: string, public readonly cause?: unknown) {
+    super(message);
+    this.name = "OutputParseError";
+  }
+}
+
+export function safeParseJson(stdout: string | null): unknown {
+  if (!stdout) {
+    throw new OutputParseError("stdout is empty");
+  }
+
+  const redacted = stdout.replace(
+    /app_[a-zA-Z0-9]+/g,
+    "<REDACTED_TOKEN>",
+  );
+
+  try {
+    return JSON.parse(redacted);
+  } catch (err) {
+    throw new OutputParseError(
+      `Failed to parse stdout as JSON (redacted): ${redacted.slice(0, 200)}`,
+      err,
+    );
+  }
+}
+
+export interface RecordListResult {
+  records: Array<{ id: string; fields: Record<string, unknown> }>;
+  total?: number;
+  hasMore?: boolean;
+}
+
+export function parseRecordList(stdout: string | null): RecordListResult {
+  const parsed = safeParseJson(stdout);
+
+  if (typeof parsed !== "object" || parsed === null) {
+    throw new OutputParseError("Expected JSON object in record list output");
+  }
+
+  const obj = parsed as Record<string, unknown>;
+  const data = (typeof obj.data === "object" && obj.data !== null)
+    ? obj.data as Record<string, unknown>
+    : null;
+  const items = obj.items ?? data?.items;
+  const totalValue = obj.total ?? data?.total;
+  const hasMoreValue = obj.has_more ?? data?.has_more;
+  const total = typeof totalValue === "number" ? totalValue : undefined;
+  const hasMore = typeof hasMoreValue === "boolean" ? hasMoreValue : undefined;
+
+  if (!Array.isArray(items)) {
+    throw new OutputParseError(
+      `Expected "items" array in record list, got ${typeof items}`,
+    );
+  }
+
+  const records = items.map((item: unknown) => {
+    if (typeof item !== "object" || item === null) {
+      throw new OutputParseError("Record item is not an object");
+    }
+    const record = item as Record<string, unknown>;
+    const recordId = record.id ?? record.record_id;
+    if (typeof recordId !== "string") {
+      throw new OutputParseError("Record item missing string \"id\" or \"record_id\"");
+    }
+    const fields = record.fields;
+    if (fields === undefined || fields === null) {
+      throw new OutputParseError(`Record "${recordId}" missing "fields"`);
+    }
+    if (typeof fields !== "object" || Array.isArray(fields)) {
+      throw new OutputParseError(`Record "${recordId}" has non-object "fields": ${typeof fields}`);
+    }
+    return {
+      id: recordId,
+      fields: fields as Record<string, unknown>,
+    };
+  });
+
+  return { records, total, hasMore };
+}
