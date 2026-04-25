@@ -1,0 +1,157 @@
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
+import { loadConfig, validateExecutionConfig, redactConfig } from "../src/config.js";
+import type { HireLoopConfig } from "../src/config.js";
+
+describe("config — dry-run does not require secrets", () => {
+  it("loads config with all empty env vars", () => {
+    const config = loadConfig({});
+    assert.equal(config.larkAppId, null);
+    assert.equal(config.larkAppSecret, null);
+    assert.equal(config.baseAppToken, null);
+    assert.equal(config.modelApiKey, null);
+    assert.equal(config.modelApiEndpoint, null);
+    assert.equal(config.allowLarkWrite, false);
+    assert.equal(config.debug, false);
+  });
+
+  it("loads config with debug enabled", () => {
+    const config = loadConfig({ DEBUG: "true" });
+    assert.equal(config.debug, true);
+  });
+
+  it("loads config with debug=1", () => {
+    const config = loadConfig({ DEBUG: "1" });
+    assert.equal(config.debug, true);
+  });
+
+  it("loads config with allowLarkWrite=1", () => {
+    const config = loadConfig({ HIRELOOP_ALLOW_LARK_WRITE: "1" });
+    assert.equal(config.allowLarkWrite, true);
+  });
+
+  it("allowLarkWrite is false for any non-1 value", () => {
+    const config = loadConfig({ HIRELOOP_ALLOW_LARK_WRITE: "yes" });
+    assert.equal(config.allowLarkWrite, false);
+  });
+});
+
+describe("config — execute mode validation", () => {
+  it("fails when all required fields are missing", () => {
+    const config = loadConfig({});
+    const errors = validateExecutionConfig(config);
+    assert.ok(errors.length >= 3);
+    const fields = errors.map((e) => e.field);
+    assert.ok(fields.includes("LARK_APP_ID"));
+    assert.ok(fields.includes("LARK_APP_SECRET"));
+    assert.ok(fields.includes("BASE_APP_TOKEN"));
+    assert.ok(fields.includes("HIRELOOP_ALLOW_LARK_WRITE"));
+  });
+
+  it("fails when only allowLarkWrite is missing", () => {
+    const config = loadConfig({
+      LARK_APP_ID: "test_id",
+      LARK_APP_SECRET: "test_secret",
+      BASE_APP_TOKEN: "test_token",
+    });
+    const errors = validateExecutionConfig(config);
+    assert.equal(errors.length, 1);
+    assert.equal(errors[0]!.field, "HIRELOOP_ALLOW_LARK_WRITE");
+  });
+
+  it("fails when allowLarkWrite is set but credentials are missing", () => {
+    const config = loadConfig({
+      HIRELOOP_ALLOW_LARK_WRITE: "1",
+    });
+    const errors = validateExecutionConfig(config);
+    assert.ok(errors.length >= 3);
+    const fields = errors.map((e) => e.field);
+    assert.ok(fields.includes("LARK_APP_ID"));
+    assert.ok(fields.includes("LARK_APP_SECRET"));
+    assert.ok(fields.includes("BASE_APP_TOKEN"));
+  });
+
+  it("passes when all required fields are present and allowLarkWrite is 1", () => {
+    const config = loadConfig({
+      LARK_APP_ID: "cli_test_id",
+      LARK_APP_SECRET: "cli_test_secret",
+      BASE_APP_TOKEN: "cli_test_token",
+      HIRELOOP_ALLOW_LARK_WRITE: "1",
+    });
+    const errors = validateExecutionConfig(config);
+    assert.equal(errors.length, 0);
+  });
+});
+
+describe("config — redactConfig does not leak secrets", () => {
+  const fullConfig: HireLoopConfig = {
+    larkAppId: "app_id_12345",
+    larkAppSecret: "secret_abcdef",
+    baseAppToken: "token_xyz789",
+    modelApiKey: "sk-abc123def456",
+    modelApiEndpoint: "https://api.example.com/v1",
+    allowLarkWrite: true,
+    debug: false,
+  };
+
+  it("redacts larkAppId", () => {
+    const redacted = redactConfig(fullConfig);
+    assert.ok(!redacted.larkAppId!.includes("app_id_12345"));
+    assert.ok(redacted.larkAppId!.includes("****"));
+  });
+
+  it("redacts larkAppSecret", () => {
+    const redacted = redactConfig(fullConfig);
+    assert.ok(!redacted.larkAppSecret!.includes("secret_abcdef"));
+    assert.ok(redacted.larkAppSecret!.includes("****"));
+  });
+
+  it("redacts baseAppToken", () => {
+    const redacted = redactConfig(fullConfig);
+    assert.ok(!redacted.baseAppToken!.includes("token_xyz789"));
+    assert.ok(redacted.baseAppToken!.includes("****"));
+  });
+
+  it("redacts modelApiKey", () => {
+    const redacted = redactConfig(fullConfig);
+    assert.ok(!redacted.modelApiKey!.includes("sk-abc123def456"));
+    assert.ok(redacted.modelApiKey!.includes("****"));
+  });
+
+  it("preserves modelApiEndpoint (not a secret)", () => {
+    const redacted = redactConfig(fullConfig);
+    assert.equal(redacted.modelApiEndpoint, "https://api.example.com/v1");
+  });
+
+  it("preserves allowLarkWrite and debug", () => {
+    const redacted = redactConfig(fullConfig);
+    assert.equal(redacted.allowLarkWrite, true);
+    assert.equal(redacted.debug, false);
+  });
+
+  it("handles null values", () => {
+    const nullConfig: HireLoopConfig = {
+      larkAppId: null,
+      larkAppSecret: null,
+      baseAppToken: null,
+      modelApiKey: null,
+      modelApiEndpoint: null,
+      allowLarkWrite: false,
+      debug: false,
+    };
+    const redacted = redactConfig(nullConfig);
+    assert.equal(redacted.larkAppId, null);
+    assert.equal(redacted.larkAppSecret, null);
+    assert.equal(redacted.baseAppToken, null);
+    assert.equal(redacted.modelApiKey, null);
+  });
+
+  it("redacts short values fully", () => {
+    const shortConfig: HireLoopConfig = {
+      ...fullConfig,
+      larkAppSecret: "ab",
+    };
+    const redacted = redactConfig(shortConfig);
+    assert.equal(redacted.larkAppSecret, "****");
+  });
+});

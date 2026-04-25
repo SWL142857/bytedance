@@ -5,7 +5,7 @@ import {
   parseScreeningOutput,
   parseInterviewKitOutput,
   SchemaValidationError,
-} from "../src/agents/schemas.ts";
+} from "../src/agents/schemas.js";
 
 const VALID_RESUME_OUTPUT = {
   facts: [
@@ -243,7 +243,7 @@ describe("schema parse — sourceExcerpt normalization", () => {
       parseStatus: "success",
     };
     const result = parseResumeParserOutput(input);
-    assert.strictEqual(result.facts[0].sourceExcerpt, null);
+    assert.strictEqual(result.facts[0]!.sourceExcerpt, null);
   });
 
   it("normalizes null sourceExcerpt in fact", () => {
@@ -254,12 +254,12 @@ describe("schema parse — sourceExcerpt normalization", () => {
       parseStatus: "success",
     };
     const result = parseResumeParserOutput(input);
-    assert.strictEqual(result.facts[0].sourceExcerpt, null);
+    assert.strictEqual(result.facts[0]!.sourceExcerpt, null);
   });
 
   it("preserves string sourceExcerpt in fact", () => {
     const result = parseResumeParserOutput(VALID_RESUME_OUTPUT);
-    assert.equal(result.facts[0].sourceExcerpt, "3 years TypeScript");
+    assert.equal(result.facts[0]!.sourceExcerpt, "3 years TypeScript");
   });
 
   it("rejects non-string non-null sourceExcerpt", () => {

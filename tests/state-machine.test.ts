@@ -5,9 +5,9 @@ import {
   assertTransition,
   getNextStates,
   TransitionError,
-} from "../src/orchestrator/state-machine.ts";
-import type { ActorType } from "../src/orchestrator/state-machine.ts";
-import type { CandidateStatus } from "../src/types/state.ts";
+} from "../src/orchestrator/state-machine.js";
+import type { ActorType } from "../src/orchestrator/state-machine.js";
+import type { CandidateStatus } from "../src/types/state.js";
 
 describe("state machine — legal transitions", () => {
   const agentTransitions: Array<[CandidateStatus, CandidateStatus]> = [
