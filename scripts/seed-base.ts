@@ -1,7 +1,7 @@
 import { parseArgs } from "node:util";
 import { loadConfig, validateExecutionConfig, redactConfig } from "../src/config.js";
 import { generateFullPlan } from "../src/base/commands.js";
-import { runCommands } from "../src/base/lark-cli-runner.js";
+import { runPlan } from "../src/base/lark-cli-runner.js";
 import { ALL_DEMO_SEEDS } from "../src/fixtures/demo-data.js";
 
 const { values } = parseArgs({
@@ -42,23 +42,17 @@ if (plan.unsupportedFields.length > 0) {
   console.log();
 }
 
-if (execute && plan.unsupportedFields.length > 0) {
-  console.error("Execution blocked: plan contains unsupported fields.");
-  console.error("Resolve unsupported field types before executing, or run in dry-run mode.");
-  process.exit(1);
-}
-
-if (plan.unsupportedFields.length > 0 && !execute) {
+if (!execute && plan.unsupportedFields.length > 0) {
   console.log("Note: seed may be incomplete because unsupported fields exist in the schema.");
   console.log("Execute mode will be blocked until all field types are supported.\n");
 }
 
-const result = runCommands(plan.commands, config, execute);
+const result = runPlan({ plan, config, execute });
 
 console.log("\n=== Summary ===");
 console.log(`Total duration: ${result.totalDurationMs}ms`);
 if (result.blocked) {
-  console.log("Status: BLOCKED — execution was blocked due to missing config or HIRELOOP_ALLOW_LARK_WRITE");
+  console.log("Status: BLOCKED — execution was blocked due to missing config, HIRELOOP_ALLOW_LARK_WRITE, or unsupported fields");
 }
 const byStatus = {
   planned: 0,

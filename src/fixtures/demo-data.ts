@@ -18,13 +18,12 @@ export const DEMO_JOB = seedFromInternal("jobs", {
     "Communication: clarity in writing specs and presenting to stakeholders.",
   status: "open",
   owner: "demo_hiring_manager",
-  created_at: "2026-04-25T00:00:00Z",
+  created_at: "2026-04-25 00:00:00",
 });
 
 export const DEMO_CANDIDATE = seedFromInternal("candidates", {
   candidate_id: DEMO_CANDIDATE_ID,
   display_name: "Candidate-Alpha",
-  job: DEMO_JOB_ID,
   resume_source: null,
   resume_text:
     "AI Product Manager with 6 years experience in technology sector. " +

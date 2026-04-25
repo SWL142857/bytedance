@@ -40,7 +40,7 @@ export const JOB_TABLE: TableDef = {
     { name: "rubric", type: "text", required: true, description: "Screening rubric / scoring criteria" },
     { name: "status", type: "select", required: true, description: "Job status", options: ["open", "paused", "closed"] },
     { name: "owner", type: "text", required: true, description: "Hiring manager or recruiter" },
-    { name: "created_at", type: "date", required: true, description: "Creation timestamp", system: true, readonly: true },
+    { name: "created_at", type: "date", required: true, description: "Creation timestamp (application-generated)" },
   ],
 };
 

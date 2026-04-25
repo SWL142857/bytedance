@@ -1,14 +1,18 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { generateSetupPlan, generateSeedPlan, generateFullPlan } from "../src/base/commands.js";
+import { generateSetupPlan, generateSeedPlan, generateFullPlan, validateExecutablePlan, ExecutionBlockedError } from "../src/base/commands.js";
 import { ALL_TABLES } from "../src/base/schema.js";
 import { DEMO_JOB, DEMO_CANDIDATE, ALL_DEMO_SEEDS } from "../src/fixtures/demo-data.js";
-import { runCommands } from "../src/base/lark-cli-runner.js";
+import { runPlan } from "../src/base/lark-cli-runner.js";
 import { loadConfig } from "../src/config.js";
 import { mapFieldDef } from "../src/base/field-mapping.js";
 
 describe("base command planner — setup plan command shape", () => {
   const plan = generateSetupPlan();
+
+  it("has zero unsupported fields", () => {
+    assert.equal(plan.unsupportedFields.length, 0, `Unsupported: ${plan.unsupportedFields.map((u) => `${u.tableName}.${u.fieldName}: ${u.fieldType}`).join(", ")}`);
+  });
 
   it("contains commands for all 7 tables", () => {
     const tableCreateCmds = plan.commands.filter(
@@ -24,6 +28,17 @@ describe("base command planner — setup plan command shape", () => {
     for (const tName of expectedTableNames) {
       assert.ok(tableNames.includes(tName), `Missing table: ${tName}`);
     }
+  });
+
+  it("creates a field command for every field in every table", () => {
+    const fieldCreateCmds = plan.commands.filter(
+      (c) => c.description.includes("Create field"),
+    );
+    let expectedFieldCount = 0;
+    for (const table of ALL_TABLES) {
+      expectedFieldCount += table.fields.length;
+    }
+    assert.equal(fieldCreateCmds.length, expectedFieldCount);
   });
 
   it("uses lark-cli as command", () => {
@@ -162,8 +177,16 @@ describe("base command planner — seed plan command shape", () => {
     assert.equal(DEMO_JOB.record.job_id, "job_demo_ai_pm_001");
   });
 
+  it("demo job uses stable datetime record format", () => {
+    assert.equal(DEMO_JOB.record.created_at, "2026-04-25 00:00:00");
+  });
+
   it("demo candidate has stable ID", () => {
     assert.equal(DEMO_CANDIDATE.record.candidate_id, "cand_demo_001");
+  });
+
+  it("demo candidate does not write link fields before record IDs exist", () => {
+    assert.equal("job" in DEMO_CANDIDATE.record, false);
   });
 
   it("demo seed data uses visible table names", () => {
@@ -197,7 +220,7 @@ describe("base command planner — seed plan command shape", () => {
   });
 });
 
-describe("base command planner — full plan ordering and unsupported", () => {
+describe("base command planner — full plan ordering", () => {
   const plan = generateFullPlan(ALL_DEMO_SEEDS);
 
   it("setup commands come before seed commands", () => {
@@ -209,19 +232,12 @@ describe("base command planner — full plan ordering and unsupported", () => {
     assert.ok(firstSeedIndex > lastSetupIndex, "Seed commands should come after setup commands");
   });
 
-  it("has unsupported fields in current schema", () => {
-    assert.ok(plan.unsupportedFields.length > 0, "Expected some unsupported fields");
+  it("full plan also has zero unsupported fields", () => {
+    assert.equal(plan.unsupportedFields.length, 0);
   });
 });
 
 describe("base command planner — field mapping", () => {
-  it("current schema unsupported fields are all date/checkbox/url/link types", () => {
-    const plan = generateSetupPlan();
-    const types = new Set(plan.unsupportedFields.map((u) => u.fieldType));
-    assert.ok(types.has("date") || types.has("checkbox") || types.has("url") || types.has("link"),
-      `Expected date/checkbox/url/link in unsupported, got: ${[...types].join(", ")}`);
-  });
-
   it("mapFieldDef returns unsupported for json type", () => {
     const result = mapFieldDef({ name: "test_json", type: "json", required: false, description: "test" });
     assert.equal(result.supported, false);
@@ -238,14 +254,6 @@ describe("base command planner — field mapping", () => {
       assert.equal(result.fieldType, "multi_select");
       assert.equal(result.fieldName, "test_multi");
       assert.ok(result.reason.length > 0);
-    }
-  });
-
-  it("mapFieldDef returns unsupported for link type", () => {
-    const result = mapFieldDef({ name: "test_link", type: "link", required: false, description: "test", linkTo: "jobs" });
-    assert.equal(result.supported, false);
-    if (!result.supported) {
-      assert.equal(result.fieldType, "link");
     }
   });
 
@@ -272,13 +280,194 @@ describe("base command planner — field mapping", () => {
       assert.deepEqual(optKeys, ["name"], `Select option should only have "name" key, got: ${optKeys.join(", ")}`);
     }
   });
+
+  it("mapFieldDef for date returns datetime with format style", () => {
+    const result = mapFieldDef({ name: "created_at", type: "date", required: true, description: "test" });
+    assert.equal(result.supported, true);
+    if (result.supported) {
+      assert.equal(result.fieldJson.type, "datetime");
+      assert.equal(result.fieldJson.name, "created_at");
+      assert.equal(result.fieldJson.style?.format, "yyyy-MM-dd HH:mm");
+      assert.equal(result.fieldJson.style?.type, undefined);
+    }
+  });
+
+  it("mapFieldDef for checkbox returns checkbox type", () => {
+    const result = mapFieldDef({ name: "is_done", type: "checkbox", required: false, description: "test" });
+    assert.equal(result.supported, true);
+    if (result.supported) {
+      assert.equal(result.fieldJson.type, "checkbox");
+      assert.equal(result.fieldJson.name, "is_done");
+      assert.equal(result.fieldJson.style, undefined);
+    }
+  });
+
+  it("mapFieldDef for url returns text with url style", () => {
+    const result = mapFieldDef({ name: "link", type: "url", required: false, description: "test" });
+    assert.equal(result.supported, true);
+    if (result.supported) {
+      assert.equal(result.fieldJson.type, "text");
+      assert.equal(result.fieldJson.name, "link");
+      assert.equal(result.fieldJson.style?.type, "url");
+    }
+  });
+
+  it("mapFieldDef for link with valid linkTo returns link with display name", () => {
+    const sourceTable = ALL_TABLES.find((t) => t.tableName === "candidates")!;
+    const result = mapFieldDef(
+      { name: "job", type: "link", required: true, description: "test", linkTo: "jobs" },
+      { sourceTable },
+    );
+    assert.equal(result.supported, true);
+    if (result.supported) {
+      assert.equal(result.fieldJson.type, "link");
+      assert.equal(result.fieldJson.name, "job");
+      assert.equal(result.fieldJson.link_table, "Jobs");
+      assert.equal(result.fieldJson.bidirectional, true);
+      assert.equal(result.fieldJson.bidirectional_link_field_name, "Candidates");
+    }
+  });
+
+  it("mapFieldDef for link without linkTo returns unsupported", () => {
+    const result = mapFieldDef({ name: "bad_link", type: "link", required: false, description: "test" });
+    assert.equal(result.supported, false);
+    if (!result.supported) {
+      assert.equal(result.fieldType, "link");
+      assert.ok(result.reason.includes("linkTo"));
+    }
+  });
+
+  it("mapFieldDef for link with unknown linkTo returns unsupported", () => {
+    const sourceTable = ALL_TABLES[0]!;
+    const result = mapFieldDef(
+      { name: "bad_link", type: "link", required: false, description: "test", linkTo: "nonexistent" },
+      { sourceTable },
+    );
+    assert.equal(result.supported, false);
+    if (!result.supported) {
+      assert.ok(result.reason.includes("unknown table"));
+    }
+  });
+
+  it("mapFieldDef for link without context returns unsupported", () => {
+    const result = mapFieldDef({ name: "test_link", type: "link", required: false, description: "test", linkTo: "jobs" });
+    assert.equal(result.supported, false);
+    if (!result.supported) {
+      assert.ok(result.reason.includes("source table context"));
+    }
+  });
+
+  it("all generated field JSONs use string type, not numeric", () => {
+    const plan = generateSetupPlan();
+    const fieldCmds = plan.commands.filter((c) => c.description.includes("Create field"));
+    for (const cmd of fieldCmds) {
+      const jsonIdx = cmd.args.indexOf("--json");
+      const jsonArg = cmd.args[jsonIdx + 1];
+      assert.ok(jsonArg, `Missing JSON for: ${cmd.description}`);
+      const fieldJson = JSON.parse(jsonArg!);
+      assert.equal(typeof fieldJson.type, "string", `Field type should be string, got ${typeof fieldJson.type} in: ${cmd.description}`);
+      assert.ok(!("field_name" in fieldJson), `Should not have field_name: ${cmd.description}`);
+      assert.ok(!("property" in fieldJson), `Should not have property: ${cmd.description}`);
+    }
+  });
+
+  it("link_table in generated JSON uses display names", () => {
+    const plan = generateSetupPlan();
+    const linkCmds = plan.commands.filter((c) => {
+      const jsonIdx = c.args.indexOf("--json");
+      if (jsonIdx < 0) return false;
+      const jsonArg = c.args[jsonIdx + 1];
+      if (!jsonArg) return false;
+      const parsed = JSON.parse(jsonArg);
+      return parsed.type === "link";
+    });
+    for (const cmd of linkCmds) {
+      const jsonIdx = cmd.args.indexOf("--json");
+      const jsonArg = cmd.args[jsonIdx + 1];
+      const fieldJson = JSON.parse(jsonArg!);
+      const isDisplayName = ALL_TABLES.some((t) => t.name === fieldJson.link_table);
+      assert.ok(isDisplayName, `link_table "${fieldJson.link_table}" is not a display name`);
+    }
+  });
+
+  it("select options in generated JSON only have name key", () => {
+    const plan = generateSetupPlan();
+    const selectCmds = plan.commands.filter((c) => {
+      const jsonIdx = c.args.indexOf("--json");
+      if (jsonIdx < 0) return false;
+      const jsonArg = c.args[jsonIdx + 1];
+      if (!jsonArg) return false;
+      const parsed = JSON.parse(jsonArg);
+      return parsed.type === "select";
+    });
+    for (const cmd of selectCmds) {
+      const jsonIdx = cmd.args.indexOf("--json");
+      const jsonArg = cmd.args[jsonIdx + 1];
+      const fieldJson = JSON.parse(jsonArg!);
+      for (const opt of fieldJson.options) {
+        assert.deepEqual(Object.keys(opt), ["name"], `Select option should only have "name" key, got: ${Object.keys(opt).join(", ")} in: ${cmd.description}`);
+      }
+    }
+  });
 });
 
-describe("base command runner — dry-run", () => {
+describe("base command planner — execute plan guard", () => {
+  it("validateExecutablePlan throws on unsupported fields", () => {
+    const plan = generateSetupPlan();
+    // Manually inject an unsupported field to test the guard
+    const badPlan = {
+      ...plan,
+      unsupportedFields: [{ tableName: "Jobs", fieldName: "bad", fieldType: "json", reason: "test" }],
+    };
+    assert.throws(
+      () => validateExecutablePlan(badPlan),
+      (err: unknown) => err instanceof ExecutionBlockedError,
+    );
+  });
+
+  it("validateExecutablePlan does not throw when unsupported is zero", () => {
+    const plan = generateSetupPlan();
+    assert.equal(plan.unsupportedFields.length, 0);
+    assert.doesNotThrow(() => validateExecutablePlan(plan));
+  });
+
+  it("runPlan with execute=true and unsupported fields returns blocked", () => {
+    const plan = generateSetupPlan();
+    const badPlan = {
+      ...plan,
+      unsupportedFields: [{ tableName: "Jobs", fieldName: "bad", fieldType: "json", reason: "test" }],
+    };
+    const config = loadConfig({
+      HIRELOOP_ALLOW_LARK_WRITE: "1",
+      LARK_APP_ID: "fake",
+      LARK_APP_SECRET: "fake",
+      BASE_APP_TOKEN: "fake",
+    });
+    const result = runPlan({ plan: badPlan, config, execute: true });
+    assert.equal(result.blocked, true);
+    for (const r of result.results) {
+      assert.equal(r.status, "skipped");
+    }
+  });
+
+  it("runPlan with execute=true and zero unsupported still blocks without config", () => {
+    const plan = generateSetupPlan();
+    assert.equal(plan.unsupportedFields.length, 0);
+    const config = loadConfig({});
+    const result = runPlan({ plan, config, execute: true });
+    // Blocked because config is missing, not because of unsupported fields
+    assert.equal(result.blocked, true);
+    for (const r of result.results) {
+      assert.equal(r.status, "skipped");
+    }
+  });
+});
+
+describe("base plan runner — dry-run and execution guards", () => {
   it("dry-run returns all commands as planned", () => {
     const plan = generateSetupPlan();
     const config = loadConfig({});
-    const result = runCommands(plan.commands, config, false);
+    const result = runPlan({ plan, config, execute: false });
 
     assert.equal(result.results.length, plan.commands.length);
     assert.equal(result.blocked, false);
@@ -292,7 +481,7 @@ describe("base command runner — dry-run", () => {
   it("execute blocked without allowLarkWrite returns skipped not planned", () => {
     const plan = generateSetupPlan();
     const config = loadConfig({});
-    const result = runCommands(plan.commands, config, true);
+    const result = runPlan({ plan, config, execute: true });
 
     assert.equal(result.blocked, true);
     for (const r of result.results) {
@@ -303,7 +492,7 @@ describe("base command runner — dry-run", () => {
   it("execute blocked without credentials returns skipped not planned", () => {
     const plan = generateSetupPlan();
     const config = loadConfig({ HIRELOOP_ALLOW_LARK_WRITE: "1" });
-    const result = runCommands(plan.commands, config, true);
+    const result = runPlan({ plan, config, execute: true });
 
     assert.equal(result.blocked, true);
     for (const r of result.results) {

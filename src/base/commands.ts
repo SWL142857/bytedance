@@ -1,6 +1,6 @@
 import type { TableDef, FieldDef } from "./schema.js";
 import { ALL_TABLES, TABLE_MAP } from "./schema.js";
-import { mapFieldDef, isUnsupported } from "./field-mapping.js";
+import { mapFieldDef, isUnsupported, type FieldMappingContext } from "./field-mapping.js";
 
 export interface BaseCommandSpec {
   description: string;
@@ -21,6 +21,23 @@ export interface UnsupportedFieldError {
 export interface PlanResult {
   commands: BaseCommandSpec[];
   unsupportedFields: UnsupportedFieldError[];
+}
+
+export class ExecutionBlockedError extends Error {
+  constructor(
+    public readonly unsupportedFields: UnsupportedFieldError[],
+  ) {
+    super(
+      `Execution blocked: ${unsupportedFields.length} unsupported field(s)`,
+    );
+    this.name = "ExecutionBlockedError";
+  }
+}
+
+export function validateExecutablePlan(plan: PlanResult): void {
+  if (plan.unsupportedFields.length > 0) {
+    throw new ExecutionBlockedError(plan.unsupportedFields);
+  }
 }
 
 const BASE_TOKEN_PLACEHOLDER = "<BASE_APP_TOKEN>";
@@ -57,7 +74,8 @@ function buildFieldCreateCommand(
   field: FieldDef,
   unsupported: UnsupportedFieldError[],
 ): BaseCommandSpec | null {
-  const mapping = mapFieldDef(field);
+  const context: FieldMappingContext = { sourceTable: table };
+  const mapping = mapFieldDef(field, context);
 
   if (isUnsupported(mapping)) {
     unsupported.push({

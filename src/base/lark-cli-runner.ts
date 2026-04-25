@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
-import type { BaseCommandSpec } from "./commands.js";
-import { injectBaseToken } from "./commands.js";
+import type { BaseCommandSpec, PlanResult } from "./commands.js";
+import { injectBaseToken, validateExecutablePlan, ExecutionBlockedError as PlanExecutionBlockedError } from "./commands.js";
 import type { HireLoopConfig } from "../config.js";
 import { validateExecutionConfig, redactConfig } from "../config.js";
 
@@ -32,7 +32,42 @@ export class ExecutionBlockedError extends Error {
   }
 }
 
-export function runCommands(
+export interface RunPlanOptions {
+  plan: PlanResult;
+  config: HireLoopConfig;
+  execute: boolean;
+}
+
+export function runPlan(options: RunPlanOptions): RunResult {
+  const { plan, config, execute } = options;
+
+  if (execute) {
+    try {
+      validateExecutablePlan(plan);
+    } catch (err) {
+      if (err instanceof PlanExecutionBlockedError) {
+        console.error("Execution blocked: plan contains unsupported fields.");
+        for (const uf of err.unsupportedFields) {
+          console.error(`  - ${uf.tableName}.${uf.fieldName}: ${uf.fieldType} — ${uf.reason}`);
+        }
+        const results: CommandResult[] = plan.commands.map((spec) => ({
+          description: spec.description,
+          status: "skipped",
+          stdout: null,
+          stderr: null,
+          exitCode: null,
+          durationMs: 0,
+        }));
+        return { results, totalDurationMs: 0, blocked: true };
+      }
+      throw err;
+    }
+  }
+
+  return runCommands(plan.commands, config, execute);
+}
+
+function runCommands(
   specs: BaseCommandSpec[],
   config: HireLoopConfig,
   execute: boolean = false,

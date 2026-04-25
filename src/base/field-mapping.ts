@@ -1,11 +1,15 @@
-import type { FieldDef, FieldType } from "./schema.js";
+import type { FieldDef, FieldType, TableDef } from "./schema.js";
+import { TABLE_MAP } from "./schema.js";
 
 export interface LarkFieldJson {
   name: string;
   type: string;
-  style?: { type: string };
+  style?: { format?: string; type?: string };
   multiple?: boolean;
   options?: Array<{ name: string }>;
+  link_table?: string;
+  bidirectional?: boolean;
+  bidirectional_link_field_name?: string;
 }
 
 export interface UnsupportedFieldResult {
@@ -19,7 +23,14 @@ export type FieldMappingResult =
   | { supported: true; fieldJson: LarkFieldJson }
   | UnsupportedFieldResult;
 
-export function mapFieldDef(field: FieldDef): FieldMappingResult {
+export interface FieldMappingContext {
+  sourceTable: TableDef;
+}
+
+export function mapFieldDef(
+  field: FieldDef,
+  context?: FieldMappingContext,
+): FieldMappingResult {
   switch (field.type) {
     case "text":
       return {
@@ -56,34 +67,68 @@ export function mapFieldDef(field: FieldDef): FieldMappingResult {
 
     case "date":
       return {
-        supported: false,
-        fieldType: field.type,
-        fieldName: field.name,
-        reason: "Field type \"date\" is not yet supported in lark-cli +field-create shortcut JSON format",
+        supported: true,
+        fieldJson: {
+          name: field.name,
+          type: "datetime",
+          style: { format: "yyyy-MM-dd HH:mm" },
+        },
       };
 
     case "checkbox":
       return {
-        supported: false,
-        fieldType: field.type,
-        fieldName: field.name,
-        reason: "Field type \"checkbox\" is not yet supported in lark-cli +field-create shortcut JSON format",
+        supported: true,
+        fieldJson: {
+          name: field.name,
+          type: "checkbox",
+        },
       };
 
     case "url":
       return {
-        supported: false,
-        fieldType: field.type,
-        fieldName: field.name,
-        reason: "Field type \"url\" is not yet supported in lark-cli +field-create shortcut JSON format",
+        supported: true,
+        fieldJson: {
+          name: field.name,
+          type: "text",
+          style: { type: "url" },
+        },
       };
 
     case "link":
+      if (!field.linkTo) {
+        return {
+          supported: false,
+          fieldType: field.type,
+          fieldName: field.name,
+          reason: "Link field missing required \"linkTo\" property",
+        };
+      }
+      const targetTable = TABLE_MAP.get(field.linkTo);
+      if (!targetTable) {
+        return {
+          supported: false,
+          fieldType: field.type,
+          fieldName: field.name,
+          reason: `Link field references unknown table "${field.linkTo}"`,
+        };
+      }
+      if (!context) {
+        return {
+          supported: false,
+          fieldType: field.type,
+          fieldName: field.name,
+          reason: "Link field mapping requires source table context",
+        };
+      }
       return {
-        supported: false,
-        fieldType: field.type,
-        fieldName: field.name,
-        reason: "Field type \"link\" is not yet supported in lark-cli +field-create shortcut JSON format (requires link_table structure)",
+        supported: true,
+        fieldJson: {
+          name: field.name,
+          type: "link",
+          link_table: targetTable.name,
+          bidirectional: true,
+          bidirectional_link_field_name: context.sourceTable.name,
+        },
       };
 
     case "json":
