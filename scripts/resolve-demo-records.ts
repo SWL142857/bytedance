@@ -8,8 +8,12 @@ import {
   recordIdentityKey,
   resolveRecordsFromOutputs,
 } from "../src/base/record-resolution.js";
+import { runRecordResolutionPlan } from "../src/base/record-resolution-runner.js";
+import { loadConfig } from "../src/config.js";
 
-const isSampleParse = process.argv.includes("--sample-parse");
+const args = process.argv.slice(2);
+const isSampleParse = args.includes("--sample-parse");
+const isExecuteReadonly = args.includes("--execute-readonly");
 
 console.log("=== MVP Demo Record Resolution ===");
 console.log("");
@@ -26,6 +30,36 @@ console.log("--- Resolution Commands ---");
 for (let i = 0; i < plan.commands.length; i++) {
   const cmd = plan.commands[i]!;
   console.log(`  [${i + 1}] ${cmd.description}`);
+}
+
+if (isExecuteReadonly) {
+  console.log("");
+  console.log("=== Execute Read-Only (--execute-readonly) ===");
+
+  const config = loadConfig();
+  const result = runRecordResolutionPlan({
+    identities: [MVP_JOB_IDENTITY, MVP_CANDIDATE_IDENTITY],
+    config,
+    execute: true,
+  });
+
+  console.log(`  Blocked: ${result.runResult.blocked}`);
+  console.log(`  Command results:`);
+  for (const r of result.runResult.results) {
+    console.log(`    - ${r.status}: ${r.description}`);
+  }
+  console.log(`  Resolved records: ${result.resolvedRecords.length}`);
+  for (const rec of result.resolvedRecords) {
+    console.log(`    - ${rec.businessId} -> ${rec.recordId}`);
+  }
+
+  if (result.resolvedRecords.length > 0) {
+    const ctx = buildMvpRecordContext(result.resolvedRecords);
+    console.log("");
+    console.log("=== MVP Record Context ===");
+    console.log(`  jobRecordId: ${ctx.jobRecordId}`);
+    console.log(`  candidateRecordId: ${ctx.candidateRecordId}`);
+  }
 }
 
 if (isSampleParse) {
