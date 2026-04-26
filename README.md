@@ -70,6 +70,8 @@ Guarded Live Write Runner（`pnpm mvp:live-write:dry-run`）对 Live Write Plan 
 
 Live write runner 会输出 execution audit summary，记录 planned/skipped/success/failed 计数、失败停在第几条命令以及 recovery note。失败后不要盲目重跑整条链路，应先人工检查 Base 中已成功写入的前序记录，再决定补偿或定向重试。
 
+Live Readiness Report（`pnpm mvp:live-readiness`）在真实写入前做只读 readiness summary，检查 config、resolution、records、write plan 和 command validation。默认 sample mode，支持 `--use-readonly-resolution` 执行真实 read-only resolution。不执行任何写命令。`ready=true` 也不代表自动执行，仍需人工 review 后再用 guarded live write runner。
+
 ## 运行方式
 
 > **注意：本项目尚在开发中。** 以下为预期的运行方式，当前不代表系统已可真实运行。
