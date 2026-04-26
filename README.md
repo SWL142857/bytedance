@@ -64,6 +64,8 @@ Record Resolution 层负责在真实 Base 执行前将应用侧 ID（`job_demo_*
 
 Read-Only Live Smoke（`pnpm base:resolve:readonly`）允许显式执行 `+record-list` 读取真实 Base 数据并解析 record ID，但不执行任何写命令（`+record-upsert`、`+table-create` 等）。执行要求：`--execute-readonly` 路径、完整飞书配置（`LARK_APP_ID`、`LARK_APP_SECRET`、`BASE_APP_TOKEN`）、`HIRELOOP_ALLOW_LARK_WRITE=1`。即使配置齐全，也只执行 `writesRemote === false` 的只读命令。
 
+Live Write Plan Builder（`pnpm mvp:live-write-plan`）使用 sample resolution 构建完整 MVP 写入计划（pipeline + human decision + analytics），所有 link/status 字段使用 `rec_xxx`。默认不执行写入，仅输出命令列表。`pnpm mvp:live-write-plan:readonly` 先通过 read-only resolution 拿到真实 `rec_xxx`，再构建写入计划；如果 resolution blocked 或未解析到记录，则不生成写入计划。
+
 ## 运行方式
 
 > **注意：本项目尚在开发中。** 以下为预期的运行方式，当前不代表系统已可真实运行。

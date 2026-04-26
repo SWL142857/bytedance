@@ -18,7 +18,9 @@
     "base:resolve:demo": "node --import tsx scripts/resolve-demo-records.ts",
     "base:resolve:sample": "node --import tsx scripts/resolve-demo-records.ts --sample-parse",
     "base:resolve:readonly": "node --import tsx scripts/resolve-demo-records.ts --execute-readonly",
-    "mvp:live-ready": "node --import tsx scripts/demo-live-ready-mvp.ts"
+    "mvp:live-ready": "node --import tsx scripts/demo-live-ready-mvp.ts",
+    "mvp:live-write-plan": "node --import tsx scripts/demo-live-write-plan.ts",
+    "mvp:live-write-plan:readonly": "node --import tsx scripts/demo-live-write-plan.ts --use-readonly-resolution"
   },
   "keywords": [
     "recruitment",
