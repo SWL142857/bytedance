@@ -84,6 +84,27 @@ Pre-API Freeze Report（`pnpm mvp:pre-api-freeze`）生成接入真实模型 API
 
 Provider Adapter Readiness（`pnpm mvp:provider-readiness`）展示 provider adapter 当前 readiness 状态。当前 provider adapter 是 disabled/fail-closed boundary，定义了接口、配置校验和错误映射，但默认不做任何外部网络调用。火山方舟接入边界要求 provider、endpoint、model ID 和 API key 配置齐全，但 demo 输出会隐藏具体 endpoint、model ID 和 key。真实 API 接入必须在后续阶段实现，并且必须保留 pre-api freeze 的 schema/state/write/redaction 边界。
 
+## 模型 API 本地配置
+
+真实模型凭证只能放在本地环境文件或部署平台的 secret manager 中，不能提交到 GitHub。推荐流程：
+
+```bash
+cp .env.example .env.local
+```
+
+然后只在 `.env.local` 中填写：
+
+```bash
+MODEL_PROVIDER=volcengine-ark
+MODEL_API_ENDPOINT=your_openai_compatible_base_url_here
+MODEL_ID=your_model_or_endpoint_id_here
+MODEL_API_KEY=your_model_api_key_here
+```
+
+`.env.local` 已被 `.gitignore` 忽略。提交前应确认 `git status --short --ignored` 中它仍显示为 ignored，并运行禁用痕迹扫描。不要把真实 API key、真实 model/endpoint ID、请求 payload、模型原始响应或完整简历文本复制到 README、issue、commit message、测试快照或日志中。
+
+当前代码只提供 fail-closed provider adapter boundary 和 readiness demo；`pnpm mvp:provider-readiness` 不读取真实 key，也不发起外部模型调用。后续实现真实 API client 时，只能读取上述环境变量，并继续遵守 pre-api freeze 约束：schema 校验不可绕过、业务状态机不可放松、Base 写入守卫不可放松、输出必须 redacted。
+
 ## 运行方式
 
 > **注意：本项目尚在开发中。** 以下为预期的运行方式，当前不代表系统已可真实运行。

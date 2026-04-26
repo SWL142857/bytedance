@@ -116,6 +116,7 @@ function redactSensitiveText(text: string | null, config: HireLoopConfig): strin
     config.larkAppSecret,
     config.baseAppToken,
     config.modelApiKey,
+    config.modelId,
   ].filter((value): value is string => typeof value === "string" && value.length > 0);
 
   let redacted = text;

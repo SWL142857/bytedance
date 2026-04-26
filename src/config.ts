@@ -4,6 +4,7 @@ export interface HireLoopConfig {
   baseAppToken: string | null;
   modelApiKey: string | null;
   modelApiEndpoint: string | null;
+  modelId: string | null;
   allowLarkWrite: boolean;
   debug: boolean;
 }
@@ -15,6 +16,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): HireLoopConfig
     baseAppToken: env.BASE_APP_TOKEN ?? null,
     modelApiKey: env.MODEL_API_KEY ?? null,
     modelApiEndpoint: env.MODEL_API_ENDPOINT ?? null,
+    modelId: env.MODEL_ID ?? null,
     allowLarkWrite: env.HIRELOOP_ALLOW_LARK_WRITE === "1",
     debug: env.DEBUG === "1" || env.DEBUG === "true",
   };
@@ -50,6 +52,7 @@ export interface RedactedConfig {
   baseAppToken: string | null;
   modelApiKey: string | null;
   modelApiEndpoint: string | null;
+  modelId: string | null;
   allowLarkWrite: boolean;
   debug: boolean;
 }
@@ -67,6 +70,7 @@ export function redactConfig(config: HireLoopConfig): RedactedConfig {
     baseAppToken: redact(config.baseAppToken),
     modelApiKey: redact(config.modelApiKey),
     modelApiEndpoint: config.modelApiEndpoint,
+    modelId: redact(config.modelId),
     allowLarkWrite: config.allowLarkWrite,
     debug: config.debug,
   };

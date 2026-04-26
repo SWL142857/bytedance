@@ -11,8 +11,21 @@ describe("config — dry-run does not require secrets", () => {
     assert.equal(config.baseAppToken, null);
     assert.equal(config.modelApiKey, null);
     assert.equal(config.modelApiEndpoint, null);
+    assert.equal(config.modelId, null);
     assert.equal(config.allowLarkWrite, false);
     assert.equal(config.debug, false);
+  });
+
+  it("loads provider API config without requiring it for dry-run", () => {
+    const config = loadConfig({
+      MODEL_API_ENDPOINT: "https://api.example.com/v1",
+      MODEL_ID: "model-or-endpoint-id",
+      MODEL_API_KEY: "sk-test",
+    });
+    assert.equal(config.modelApiEndpoint, "https://api.example.com/v1");
+    assert.equal(config.modelId, "model-or-endpoint-id");
+    assert.equal(config.modelApiKey, "sk-test");
+    assert.equal(config.allowLarkWrite, false);
   });
 
   it("loads config with debug enabled", () => {
@@ -90,6 +103,7 @@ describe("config — redactConfig does not leak secrets", () => {
     baseAppToken: "token_xyz789",
     modelApiKey: "sk-abc123def456",
     modelApiEndpoint: "https://api.example.com/v1",
+    modelId: "model-or-endpoint-id",
     allowLarkWrite: true,
     debug: false,
   };
@@ -123,6 +137,12 @@ describe("config — redactConfig does not leak secrets", () => {
     assert.equal(redacted.modelApiEndpoint, "https://api.example.com/v1");
   });
 
+  it("redacts modelId", () => {
+    const redacted = redactConfig(fullConfig);
+    assert.ok(!redacted.modelId!.includes("model-or-endpoint-id"));
+    assert.ok(redacted.modelId!.includes("****"));
+  });
+
   it("preserves allowLarkWrite and debug", () => {
     const redacted = redactConfig(fullConfig);
     assert.equal(redacted.allowLarkWrite, true);
@@ -136,6 +156,7 @@ describe("config — redactConfig does not leak secrets", () => {
       baseAppToken: null,
       modelApiKey: null,
       modelApiEndpoint: null,
+      modelId: null,
       allowLarkWrite: false,
       debug: false,
     };
@@ -144,6 +165,7 @@ describe("config — redactConfig does not leak secrets", () => {
     assert.equal(redacted.larkAppSecret, null);
     assert.equal(redacted.baseAppToken, null);
     assert.equal(redacted.modelApiKey, null);
+    assert.equal(redacted.modelId, null);
   });
 
   it("redacts short values fully", () => {
