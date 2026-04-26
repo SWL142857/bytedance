@@ -72,6 +72,8 @@ Live write runner 会输出 execution audit summary，记录 planned/skipped/suc
 
 Live Readiness Report（`pnpm mvp:live-readiness`）在真实写入前做只读 readiness summary，检查 config、resolution、records、write plan 和 command validation。默认 sample mode，支持 `--use-readonly-resolution` 执行真实 read-only resolution。不执行任何写命令。`ready=true` 也不代表自动执行，仍需人工 review 后再用 guarded live write runner。
 
+Live Recovery Plan（`pnpm mvp:live-recovery`）根据 execution audit 生成结构化失败恢复计划，评估风险等级和已写入命令数，给出人工核对清单和重跑策略。失败后不要盲目重跑整链路，先用 audit 和 recovery plan 做人工核对和定向补偿判断。
+
 ## 运行方式
 
 > **注意：本项目尚在开发中。** 以下为预期的运行方式，当前不代表系统已可真实运行。
