@@ -12,6 +12,7 @@ describe("config — dry-run does not require secrets", () => {
     assert.equal(config.modelApiKey, null);
     assert.equal(config.modelApiEndpoint, null);
     assert.equal(config.modelId, null);
+    assert.equal(config.modelProvider, "volcengine-ark");
     assert.equal(config.allowLarkWrite, false);
     assert.equal(config.debug, false);
   });
@@ -104,6 +105,7 @@ describe("config — redactConfig does not leak secrets", () => {
     modelApiKey: "sk-abc123def456",
     modelApiEndpoint: "https://api.example.com/v1",
     modelId: "model-or-endpoint-id",
+    modelProvider: "volcengine-ark",
     allowLarkWrite: true,
     debug: false,
   };
@@ -132,9 +134,10 @@ describe("config — redactConfig does not leak secrets", () => {
     assert.ok(redacted.modelApiKey!.includes("****"));
   });
 
-  it("preserves modelApiEndpoint (not a secret)", () => {
+  it("redacts modelApiEndpoint", () => {
     const redacted = redactConfig(fullConfig);
-    assert.equal(redacted.modelApiEndpoint, "https://api.example.com/v1");
+    assert.ok(!redacted.modelApiEndpoint!.includes("https://api.example.com/v1"));
+    assert.ok(redacted.modelApiEndpoint!.includes("****"));
   });
 
   it("redacts modelId", () => {
@@ -149,6 +152,11 @@ describe("config — redactConfig does not leak secrets", () => {
     assert.equal(redacted.debug, false);
   });
 
+  it("preserves modelProvider", () => {
+    const redacted = redactConfig(fullConfig);
+    assert.equal(redacted.modelProvider, "volcengine-ark");
+  });
+
   it("handles null values", () => {
     const nullConfig: HireLoopConfig = {
       larkAppId: null,
@@ -157,6 +165,7 @@ describe("config — redactConfig does not leak secrets", () => {
       modelApiKey: null,
       modelApiEndpoint: null,
       modelId: null,
+      modelProvider: "volcengine-ark",
       allowLarkWrite: false,
       debug: false,
     };
@@ -165,6 +174,7 @@ describe("config — redactConfig does not leak secrets", () => {
     assert.equal(redacted.larkAppSecret, null);
     assert.equal(redacted.baseAppToken, null);
     assert.equal(redacted.modelApiKey, null);
+    assert.equal(redacted.modelApiEndpoint, null);
     assert.equal(redacted.modelId, null);
   });
 

@@ -35,7 +35,7 @@ function getScenario(): ProviderAdapterConfig {
     return {
       enabled: true,
       providerName: "volcengine-ark",
-      endpoint: "https://ark.cn-beijing.volces.com/api/v3",
+      endpoint: "https://provider.example.invalid/v1",
       modelId: "ep-demo-model-not-real",
       apiKey: "ark-demo-key-not-real",
     };

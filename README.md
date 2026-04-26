@@ -86,6 +86,8 @@ Provider Adapter Readiness（`pnpm mvp:provider-readiness`）展示 provider ada
 
 Provider Connectivity Smoke（`pnpm mvp:provider-smoke`）dry-run 默认不发起外部模型调用，只说明需要哪些环境变量。真实连通性测试必须显式 `pnpm mvp:provider-smoke:execute`，并满足 `--execute` + `--confirm=EXECUTE_PROVIDER_SMOKE` + 本地 `MODEL_API_ENDPOINT` / `MODEL_ID` / `MODEL_API_KEY` 齐全。Smoke 只发送固定安全 prompt（"ping"），不发送简历文本、JD 或 Base record ID。输出只包含 redacted summary（status、httpStatus、hasChoices、contentLength、durationMs、errorKind），不包含 endpoint、apiKey、modelId、request payload、authorization header 或 raw response。此工具只用于人工确认 provider 可达，不代表业务 agent 已接入模型。不要把 key、model ID、endpoint 或 raw response 放进日志、issue 或 commit。
 
+Provider Client Implementation（Phase 5.5）增加了 `OpenAICompatibleClient`，实现了 `LlmClient` 接口，可向 OpenAI-compatible endpoint 发送 `POST /chat/completions` 请求。该 client 通过 `buildProviderAdapterReadiness` 守卫，默认 disabled/blocked 时不调用任何外部 API；只在 config 完整且 enabled 时才发起请求。当前默认 demos（`pnpm mvp:demo`、`pnpm pipeline:demo` 等）仍使用 `DeterministicLlmClient`，业务 agents 不直接 import `OpenAICompatibleClient`。真实 provider client 只是后续 opt-in agent demo 的基础。所有测试均 mock fetch，不允许真实网络调用。Provider 错误映射为安全错误类型，不透传 raw body、apiKey、endpoint 或 modelId。
+
 ## 模型 API 本地配置
 
 真实模型凭证只能放在本地环境文件或部署平台的 secret manager 中，不能提交到 GitHub。推荐流程：
@@ -105,7 +107,7 @@ MODEL_API_KEY=your_model_api_key_here
 
 `.env.local` 已被 `.gitignore` 忽略。提交前应确认 `git status --short --ignored` 中它仍显示为 ignored，并运行禁用痕迹扫描。不要把真实 API key、真实 model/endpoint ID、请求 payload、模型原始响应或完整简历文本复制到 README、issue、commit message、测试快照或日志中。
 
-当前代码只提供 fail-closed provider adapter boundary 和 readiness demo；`pnpm mvp:provider-readiness` 不读取真实 key，也不发起外部模型调用。后续实现真实 API client 时，只能读取上述环境变量，并继续遵守 pre-api freeze 约束：schema 校验不可绕过、业务状态机不可放松、Base 写入守卫不可放松、输出必须 redacted。
+当前代码只提供 fail-closed provider adapter boundary 和 readiness demo；`pnpm mvp:provider-readiness` 不读取真实 key，也不发起外部模型调用。后续实现真实 API client 时，只能读取上述环境变量，并继续遵守 pre-api freeze 约束：schema 校验不可绕过、业务状态机不可放松、Base 写入守卫不可放松、输出必须 redacted。Phase 5.5 已实现 `OpenAICompatibleClient`，但默认 demos 仍使用 deterministic client。
 
 ## 运行方式
 

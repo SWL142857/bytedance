@@ -5,6 +5,7 @@ export interface HireLoopConfig {
   modelApiKey: string | null;
   modelApiEndpoint: string | null;
   modelId: string | null;
+  modelProvider: string;
   allowLarkWrite: boolean;
   debug: boolean;
 }
@@ -17,6 +18,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): HireLoopConfig
     modelApiKey: env.MODEL_API_KEY ?? null,
     modelApiEndpoint: env.MODEL_API_ENDPOINT ?? null,
     modelId: env.MODEL_ID ?? null,
+    modelProvider: env.MODEL_PROVIDER ?? "volcengine-ark",
     allowLarkWrite: env.HIRELOOP_ALLOW_LARK_WRITE === "1",
     debug: env.DEBUG === "1" || env.DEBUG === "true",
   };
@@ -53,6 +55,7 @@ export interface RedactedConfig {
   modelApiKey: string | null;
   modelApiEndpoint: string | null;
   modelId: string | null;
+  modelProvider: string;
   allowLarkWrite: boolean;
   debug: boolean;
 }
@@ -69,8 +72,9 @@ export function redactConfig(config: HireLoopConfig): RedactedConfig {
     larkAppSecret: redact(config.larkAppSecret),
     baseAppToken: redact(config.baseAppToken),
     modelApiKey: redact(config.modelApiKey),
-    modelApiEndpoint: config.modelApiEndpoint,
+    modelApiEndpoint: redact(config.modelApiEndpoint),
     modelId: redact(config.modelId),
+    modelProvider: config.modelProvider,
     allowLarkWrite: config.allowLarkWrite,
     debug: config.debug,
   };
