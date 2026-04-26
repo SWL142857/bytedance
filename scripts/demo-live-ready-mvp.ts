@@ -61,8 +61,8 @@ const resolvedRecords = resolveRecordsFromOutputs(
   },
 );
 const ctx = buildMvpRecordContext(resolvedRecords);
-console.log(`  jobRecordId: ${ctx.jobRecordId}`);
-console.log(`  candidateRecordId: ${ctx.candidateRecordId}`);
+console.log(`  job record: resolved`);
+console.log(`  candidate record: resolved`);
 
 // Stage 1: Agent Pipeline (using resolved record IDs)
 console.log("");
@@ -135,7 +135,7 @@ const resolutionCmds = resolutionPlan.commands.length;
 const totalCommands = resolutionCmds + pipeline.commands.length + decision.commands.length + report.commands.length;
 console.log("");
 console.log("=== Live-Ready MVP Summary ===");
-console.log(`  Resolution: ${resolutionCmds} command(s), job=${ctx.jobRecordId}, candidate=${ctx.candidateRecordId}`);
+console.log(`  Resolution: ${resolutionCmds} command(s), 2 records resolved`);
 console.log(`  Pipeline: ${pipeline.finalStatus} (completed: ${pipeline.completed})`);
 console.log(`  Decision: ${decision.finalStatus}`);
 console.log(`  Report: ${report.agentRun.run_status}`);

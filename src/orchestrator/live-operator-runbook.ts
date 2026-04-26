@@ -123,7 +123,7 @@ function buildExecuteStep(
       name: "Guarded Live Execute",
       status: "blocked",
       summary: "Cannot execute. Preceding checks must pass first.",
-      commandHint: "pnpm mvp:live-write:execute (requires all checks ready)",
+      commandHint: "Run guarded live write (requires all checks ready)",
     };
   }
   return {
@@ -131,7 +131,7 @@ function buildExecuteStep(
     name: "Guarded Live Execute",
     status: "ready",
     summary: "Preconditions met. Execute with guarded runner after human approval.",
-    commandHint: "pnpm mvp:live-write:execute",
+    commandHint: "Run guarded live write execute",
   };
 }
 
