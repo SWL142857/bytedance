@@ -456,6 +456,7 @@ describe("base command planner — execute plan guard", () => {
     const config = loadConfig({});
     const result = runPlan({ plan, config, execute: true });
     // Blocked because config is missing, not because of unsupported fields
+    assert.equal(result.mode, "execute");
     assert.equal(result.blocked, true);
     for (const r of result.results) {
       assert.equal(r.status, "skipped");
@@ -469,6 +470,7 @@ describe("base plan runner — dry-run and execution guards", () => {
     const config = loadConfig({});
     const result = runPlan({ plan, config, execute: false });
 
+    assert.equal(result.mode, "dry_run");
     assert.equal(result.results.length, plan.commands.length);
     assert.equal(result.blocked, false);
     for (const r of result.results) {
@@ -483,6 +485,7 @@ describe("base plan runner — dry-run and execution guards", () => {
     const config = loadConfig({});
     const result = runPlan({ plan, config, execute: true });
 
+    assert.equal(result.mode, "execute");
     assert.equal(result.blocked, true);
     for (const r of result.results) {
       assert.equal(r.status, "skipped", `Expected skipped but got ${r.status} for: ${r.description}`);
@@ -494,6 +497,7 @@ describe("base plan runner — dry-run and execution guards", () => {
     const config = loadConfig({ HIRELOOP_ALLOW_LARK_WRITE: "1" });
     const result = runPlan({ plan, config, execute: true });
 
+    assert.equal(result.mode, "execute");
     assert.equal(result.blocked, true);
     for (const r of result.results) {
       assert.equal(r.status, "skipped", `Expected skipped but got ${r.status} for: ${r.description}`);

@@ -85,6 +85,7 @@ describe("runLiveMvpWrites — dry-run", () => {
     });
 
     assert.equal(result.blocked, false);
+    assert.equal(result.mode, "dry_run");
     assert.equal(result.executed, false);
     assert.equal(result.plan.commands.length, 20);
     assert.equal(result.results.length, 20);
@@ -108,6 +109,7 @@ describe("runLiveMvpWrites — execution guards", () => {
     });
 
     assert.equal(result.blocked, true);
+    assert.equal(result.mode, "execute");
     assert.equal(result.executed, false);
     assert.equal(result.results.length, 20);
     assert.equal(result.results[0]!.status, "skipped");
@@ -130,6 +132,7 @@ describe("runLiveMvpWrites — execution guards", () => {
     });
 
     assert.equal(result.blocked, true);
+    assert.equal(result.mode, "execute");
     assert.equal(result.executed, false);
     assert.equal(result.results[0]!.status, "skipped");
     assert.equal(calls, 0);
@@ -150,6 +153,7 @@ describe("runLiveMvpWrites — execution guards", () => {
     });
 
     assert.equal(result.blocked, true);
+    assert.equal(result.mode, "execute");
     assert.equal(result.executed, false);
     assert.equal(result.results[0]!.status, "skipped");
     assert.equal(calls, 0);
@@ -186,6 +190,7 @@ describe("runLiveMvpWrites — execute with injected executor", () => {
     });
 
     assert.equal(result.blocked, false);
+    assert.equal(result.mode, "execute");
     assert.equal(result.executed, true);
     assert.equal(result.results.length, 20);
     assert.equal(result.results.every((r) => r.status === "success"), true);
@@ -214,6 +219,7 @@ describe("runLiveMvpWrites — execute with injected executor", () => {
     });
 
     assert.equal(result.blocked, false);
+    assert.equal(result.mode, "execute");
     assert.equal(result.executed, true);
     assert.equal(result.results.length, 1);
     assert.equal(result.results[0]!.status, "failed");

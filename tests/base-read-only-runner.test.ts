@@ -173,6 +173,7 @@ describe("runReadOnlyCommands — dry-run", () => {
       config: loadConfig({}),
       execute: false,
     });
+    assert.equal(result.mode, "dry_run");
     assert.equal(result.blocked, false);
     assert.equal(result.results.length, 1);
     assert.equal(result.results[0]!.status, "planned");
@@ -184,6 +185,7 @@ describe("runReadOnlyCommands — dry-run", () => {
       config: loadConfig({}),
       execute: true,
     });
+    assert.equal(result.mode, "execute");
     assert.equal(result.blocked, false);
     assert.deepEqual(result.results, []);
   });
@@ -207,6 +209,7 @@ describe("runReadOnlyCommands — execute blocked", () => {
       config: loadConfig({}),
       execute: true,
     });
+    assert.equal(result.mode, "execute");
     assert.equal(result.blocked, true);
     assert.equal(result.results[0]!.status, "skipped");
   });
@@ -221,6 +224,7 @@ describe("runReadOnlyCommands — execute blocked", () => {
       }),
       execute: true,
     });
+    assert.equal(result.mode, "execute");
     assert.equal(result.blocked, true);
     assert.equal(result.results[0]!.status, "skipped");
   });
@@ -235,6 +239,7 @@ describe("runReadOnlyCommands — execute blocked", () => {
       }),
       execute: true,
     });
+    assert.equal(result.mode, "execute");
     assert.equal(result.blocked, true);
     const resultStr = JSON.stringify(result);
     assert.ok(!resultStr.includes("secret_id_123"), "Must not leak LARK_APP_ID");
@@ -273,6 +278,7 @@ describe("runReadOnlyCommands — custom executor", () => {
       executor: fakeExecutor,
     });
 
+    assert.equal(result.mode, "execute");
     assert.equal(result.blocked, false);
     assert.equal(result.results.length, 1);
     assert.equal(result.results[0]!.status, "success");

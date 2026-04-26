@@ -72,6 +72,8 @@ describe("runRecordResolutionPlan — dry-run", () => {
       config: loadConfig({}),
       execute: false,
     });
+    assert.equal(result.mode, "dry_run");
+    assert.equal(result.runResult.mode, "dry_run");
     assert.equal(result.runResult.blocked, false);
     assert.equal(result.runResult.results[0]!.status, "planned");
     assert.equal(result.resolvedRecords.length, 0);
@@ -85,6 +87,8 @@ describe("runRecordResolutionPlan — execute blocked", () => {
       config: loadConfig({}),
       execute: true,
     });
+    assert.equal(result.mode, "execute");
+    assert.equal(result.runResult.mode, "execute");
     assert.equal(result.runResult.blocked, true);
     assert.equal(result.resolvedRecords.length, 0);
   });
@@ -99,6 +103,8 @@ describe("runRecordResolutionPlan — execute blocked", () => {
       }),
       execute: true,
     });
+    assert.equal(result.mode, "execute");
+    assert.equal(result.runResult.mode, "execute");
     assert.equal(result.runResult.blocked, true);
     assert.equal(result.resolvedRecords.length, 0);
   });
@@ -122,6 +128,8 @@ describe("runRecordResolutionPlan — command failure", () => {
       executor: failExecutor,
     });
 
+    assert.equal(result.mode, "execute");
+    assert.equal(result.runResult.mode, "execute");
     assert.equal(result.resolvedRecords.length, 0);
     assert.equal(result.runResult.results[0]!.status, "failed");
   });
@@ -143,6 +151,8 @@ describe("runRecordResolutionPlan — command failure", () => {
       executor: skipExecutor,
     });
 
+    assert.equal(result.mode, "execute");
+    assert.equal(result.runResult.mode, "execute");
     assert.equal(result.resolvedRecords.length, 0);
   });
 });
@@ -160,6 +170,8 @@ describe("runRecordResolutionPlan — success resolution", () => {
       executor,
     });
 
+    assert.equal(result.mode, "execute");
+    assert.equal(result.runResult.mode, "execute");
     assert.equal(result.resolvedRecords.length, 1);
     assert.equal(result.resolvedRecords[0]!.recordId, "recJob001");
     assert.equal(result.resolvedRecords[0]!.businessId, "job_demo_ai_pm_001");
@@ -178,6 +190,8 @@ describe("runRecordResolutionPlan — success resolution", () => {
       executor,
     });
 
+    assert.equal(result.mode, "execute");
+    assert.equal(result.runResult.mode, "execute");
     assert.equal(result.resolvedRecords.length, 2);
     assert.equal(result.resolvedRecords[0]!.tableName, "jobs");
     assert.equal(result.resolvedRecords[0]!.recordId, "recJob001");

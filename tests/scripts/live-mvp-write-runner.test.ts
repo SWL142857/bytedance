@@ -33,10 +33,15 @@ describe("live MVP write runner script — dry-run", () => {
     assert.match(result.stdout, /Executed: false/);
     assert.match(result.stdout, /Results: 20/);
     assert.match(result.stdout, /planned: Upsert record into "Agent Runs"/);
+    assert.match(result.stdout, /=== Execution Audit ===/);
+    assert.match(result.stdout, /mode: dry_run/);
+    assert.match(result.stdout, /planned: 20/);
+    assert.match(result.stdout, /recoveryNote: .*No writes were executed/);
     assert.ok(!result.stdout.includes("--json"));
     assert.ok(!result.stdout.includes("--base-token"));
     assert.ok(!result.stdout.includes("rec_demo_job_001"));
     assert.ok(!result.stdout.includes("AI Product Manager with 6 years"));
+    assert.ok(!result.stdout.includes("raw stdout"));
   });
 });
 
@@ -49,8 +54,14 @@ describe("live MVP write runner script — execute guards", () => {
 
     assert.equal(result.status, 0);
     assert.match(result.stdout, /Execution blocked: --execute requires --use-readonly-resolution/);
+    assert.match(result.stdout, /No write run generated/);
     assert.ok(!result.stdout.includes("=== Write Run ==="));
     assert.ok(!result.stdout.includes("success:"));
+    assert.ok(!result.stdout.includes("--json"));
+    assert.ok(!result.stdout.includes("--base-token"));
+    assert.ok(!result.stdout.includes("rec_demo_job_001"));
+    assert.ok(!result.stdout.includes("AI Product Manager with 6 years"));
+    assert.ok(!result.stdout.includes("raw stdout"));
   });
 
   it("blocks execute without confirmation before resolution", () => {
@@ -58,7 +69,13 @@ describe("live MVP write runner script — execute guards", () => {
 
     assert.equal(result.status, 0);
     assert.match(result.stdout, /Execution blocked: --confirm=EXECUTE_LIVE_MVP_WRITES is required/);
+    assert.match(result.stdout, /No write run generated/);
     assert.ok(!result.stdout.includes("=== Write Run ==="));
+    assert.ok(!result.stdout.includes("--json"));
+    assert.ok(!result.stdout.includes("--base-token"));
+    assert.ok(!result.stdout.includes("rec_demo_job_001"));
+    assert.ok(!result.stdout.includes("AI Product Manager with 6 years"));
+    assert.ok(!result.stdout.includes("raw stdout"));
   });
 
   it("blocks readonly execute with missing config and generates no write run", () => {
@@ -74,5 +91,8 @@ describe("live MVP write runner script — execute guards", () => {
     assert.ok(!result.stdout.includes("=== Write Run ==="));
     assert.ok(!result.stdout.includes("--json"));
     assert.ok(!result.stdout.includes("--base-token"));
+    assert.ok(!result.stdout.includes("rec_demo_job_001"));
+    assert.ok(!result.stdout.includes("AI Product Manager with 6 years"));
+    assert.ok(!result.stdout.includes("raw stdout"));
   });
 });

@@ -12,6 +12,7 @@ import {
   type ReadOnlyRunResult,
   type CommandExecutor,
 } from "./read-only-runner.js";
+import type { RunMode } from "./lark-cli-runner.js";
 
 export interface RecordResolutionRunOptions {
   identities: RecordIdentity[];
@@ -21,6 +22,7 @@ export interface RecordResolutionRunOptions {
 }
 
 export interface RecordResolutionRunResult {
+  mode: RunMode;
   runResult: ReadOnlyRunResult;
   resolvedRecords: ResolvedRecord[];
 }
@@ -40,11 +42,11 @@ export function runRecordResolutionPlan(
   });
 
   if (!execute) {
-    return { runResult, resolvedRecords: [] };
+    return { mode: runResult.mode, runResult, resolvedRecords: [] };
   }
 
   if (runResult.blocked) {
-    return { runResult, resolvedRecords: [] };
+    return { mode: runResult.mode, runResult, resolvedRecords: [] };
   }
 
   const allSuccess = runResult.results.every(
@@ -52,7 +54,7 @@ export function runRecordResolutionPlan(
   );
 
   if (!allSuccess) {
-    return { runResult, resolvedRecords: [] };
+    return { mode: runResult.mode, runResult, resolvedRecords: [] };
   }
 
   const stdoutByKey: Record<string, string | null> = {};
@@ -64,11 +66,11 @@ export function runRecordResolutionPlan(
 
   try {
     const resolvedRecords = resolveRecordsFromOutputs(identities, stdoutByKey);
-    return { runResult, resolvedRecords };
+    return { mode: runResult.mode, runResult, resolvedRecords };
   } catch (err) {
     if (err instanceof RecordResolutionError) {
       console.error(`Resolution failed: ${err.message}`);
-      return { runResult, resolvedRecords: [] };
+      return { mode: runResult.mode, runResult, resolvedRecords: [] };
     }
     throw err;
   }

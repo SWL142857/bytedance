@@ -3,7 +3,7 @@ import type { BaseCommandSpec } from "./commands.js";
 import { injectBaseToken } from "./commands.js";
 import type { HireLoopConfig } from "../config.js";
 import { validateExecutionConfig, redactConfig } from "../config.js";
-import type { CommandResult } from "./lark-cli-runner.js";
+import type { CommandResult, RunMode } from "./lark-cli-runner.js";
 
 export type { CommandResult };
 
@@ -15,6 +15,7 @@ export interface ReadOnlyRunOptions {
 }
 
 export interface ReadOnlyRunResult {
+  mode: RunMode;
   results: CommandResult[];
   blocked: boolean;
 }
@@ -145,11 +146,12 @@ export function runReadOnlyCommands(
   options: ReadOnlyRunOptions,
 ): ReadOnlyRunResult {
   const { commands, config, execute } = options;
+  const mode: RunMode = execute ? "execute" : "dry_run";
 
   assertReadOnlyCommands(commands);
 
   if (commands.length === 0) {
-    return { results: [], blocked: false };
+    return { mode, results: [], blocked: false };
   }
 
   if (!execute) {
@@ -161,7 +163,7 @@ export function runReadOnlyCommands(
       exitCode: null,
       durationMs: 0,
     }));
-    return { results, blocked: false };
+    return { mode, results, blocked: false };
   }
 
   const configErrors = validateExecutionConfig(config);
@@ -179,7 +181,7 @@ export function runReadOnlyCommands(
       exitCode: null,
       durationMs: 0,
     }));
-    return { results, blocked: true };
+    return { mode, results, blocked: true };
   }
 
   if (!config.allowLarkWrite) {
@@ -193,7 +195,7 @@ export function runReadOnlyCommands(
       exitCode: null,
       durationMs: 0,
     }));
-    return { results, blocked: true };
+    return { mode, results, blocked: true };
   }
 
   const executor = options.executor ?? defaultExecutor;
@@ -242,5 +244,5 @@ export function runReadOnlyCommands(
     console.log(`[SUCCESS] ${cmd.description}`);
   }
 
-  return { results, blocked: false };
+  return { mode, results, blocked: false };
 }

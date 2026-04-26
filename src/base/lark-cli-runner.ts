@@ -5,6 +5,7 @@ import type { HireLoopConfig } from "../config.js";
 import { validateExecutionConfig, redactConfig } from "../config.js";
 
 export type CommandResultStatus = "planned" | "skipped" | "success" | "failed";
+export type RunMode = "dry_run" | "execute";
 
 export interface CommandResult {
   description: string;
@@ -16,6 +17,7 @@ export interface CommandResult {
 }
 
 export interface RunResult {
+  mode: RunMode;
   results: CommandResult[];
   totalDurationMs: number;
   blocked: boolean;
@@ -40,6 +42,7 @@ export interface RunPlanOptions {
 
 export function runPlan(options: RunPlanOptions): RunResult {
   const { plan, config, execute } = options;
+  const mode: RunMode = execute ? "execute" : "dry_run";
 
   if (execute) {
     try {
@@ -58,7 +61,7 @@ export function runPlan(options: RunPlanOptions): RunResult {
           exitCode: null,
           durationMs: 0,
         }));
-        return { results, totalDurationMs: 0, blocked: true };
+        return { mode, results, totalDurationMs: 0, blocked: true };
       }
       throw err;
     }
@@ -72,6 +75,7 @@ function runCommands(
   config: HireLoopConfig,
   execute: boolean = false,
 ): RunResult {
+  const mode: RunMode = execute ? "execute" : "dry_run";
   const results: CommandResult[] = [];
   const startTime = Date.now();
 
@@ -90,7 +94,7 @@ function runCommands(
           durationMs: 0,
         });
       }
-      return { results, totalDurationMs: Date.now() - startTime, blocked: true };
+      return { mode, results, totalDurationMs: Date.now() - startTime, blocked: true };
     }
 
     const errors = validateExecutionConfig(config);
@@ -110,7 +114,7 @@ function runCommands(
           durationMs: 0,
         });
       }
-      return { results, totalDurationMs: Date.now() - startTime, blocked: true };
+      return { mode, results, totalDurationMs: Date.now() - startTime, blocked: true };
     }
   }
 
@@ -181,6 +185,7 @@ function runCommands(
   }
 
   return {
+    mode,
     results,
     totalDurationMs: Date.now() - startTime,
     blocked: false,

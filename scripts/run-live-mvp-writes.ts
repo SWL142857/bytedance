@@ -13,6 +13,7 @@ import {
   LIVE_MVP_WRITE_CONFIRMATION,
   runLiveMvpWrites,
 } from "../src/orchestrator/live-mvp-runner.js";
+import { buildLiveMvpExecutionAudit } from "../src/orchestrator/live-mvp-audit.js";
 
 const args = process.argv.slice(2);
 const useReadonlyResolution = args.includes("--use-readonly-resolution");
@@ -129,6 +130,27 @@ async function main(): Promise<void> {
     const result = run.results[i]!;
     console.log(`  [${i + 1}] ${result.status}: ${result.description}`);
   }
+
+  console.log("");
+  console.log("=== Execution Audit ===");
+  const audit = buildLiveMvpExecutionAudit(run);
+  printResultHeader("mode", audit.mode);
+  printResultHeader("blocked", audit.blocked);
+  printResultHeader("executed", audit.executed);
+  printResultHeader("totalCommands", audit.totalCommands);
+  printResultHeader("planned", audit.plannedCount);
+  printResultHeader("skipped", audit.skippedCount);
+  printResultHeader("success", audit.successCount);
+  printResultHeader("failed", audit.failedCount);
+  printResultHeader(
+    "stoppedAtCommandIndex",
+    audit.stoppedAtCommandIndex ?? "null",
+  );
+  printResultHeader(
+    "stoppedAtDescription",
+    audit.stoppedAtDescription ?? "null",
+  );
+  printResultHeader("recoveryNote", audit.recoveryNote);
 
   console.log("");
   console.log("Done.");

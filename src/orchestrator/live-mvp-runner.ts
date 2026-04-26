@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { injectBaseToken, type BaseCommandSpec } from "../base/commands.js";
-import type { CommandResult } from "../base/lark-cli-runner.js";
+import type { CommandResult, RunMode } from "../base/lark-cli-runner.js";
 import type { ResolvedRecord } from "../base/record-resolution.js";
 import type { HireLoopConfig } from "../config.js";
 import { redactConfig, validateExecutionConfig } from "../config.js";
@@ -33,6 +33,7 @@ export interface LiveMvpWriteRunOptions {
 }
 
 export interface LiveMvpWriteRunResult {
+  mode: RunMode;
   plan: LiveMvpPlanResult;
   results: CommandResult[];
   blocked: boolean;
@@ -142,8 +143,10 @@ function normalizeResult(
 function buildBlockedResult(
   plan: LiveMvpPlanResult,
   blockedReasons: string[],
+  mode: RunMode,
 ): LiveMvpWriteRunResult {
   return {
+    mode,
     plan,
     results: plannedResults(plan.commands, "skipped"),
     blocked: true,
@@ -155,6 +158,7 @@ function buildBlockedResult(
 export async function runLiveMvpWrites(
   options: LiveMvpWriteRunOptions,
 ): Promise<LiveMvpWriteRunResult> {
+  const mode: RunMode = options.execute ? "execute" : "dry_run";
   const plan = await buildLiveMvpPlan(
     {
       resolvedRecords: options.resolvedRecords,
@@ -172,6 +176,7 @@ export async function runLiveMvpWrites(
       return buildBlockedResult(
         plan,
         err.blockedCommands.map((cmd) => `Invalid write command: ${cmd}`),
+        mode,
       );
     }
     throw err;
@@ -179,6 +184,7 @@ export async function runLiveMvpWrites(
 
   if (!options.execute) {
     return {
+      mode,
       plan,
       results: plannedResults(plan.commands, "planned"),
       blocked: false,
@@ -190,13 +196,13 @@ export async function runLiveMvpWrites(
   if (options.resolutionSource !== "readonly") {
     return buildBlockedResult(plan, [
       "Live write execution requires read-only resolution source",
-    ]);
+    ], mode);
   }
 
   if (options.confirmation !== LIVE_MVP_WRITE_CONFIRMATION) {
     return buildBlockedResult(plan, [
       `Missing confirmation phrase: ${LIVE_MVP_WRITE_CONFIRMATION}`,
-    ]);
+    ], mode);
   }
 
   const configErrors = validateExecutionConfig(options.config);
@@ -209,6 +215,7 @@ export async function runLiveMvpWrites(
     return buildBlockedResult(
       plan,
       configErrors.map((err) => `${err.field}: ${err.message}`),
+      mode,
     );
   }
 
@@ -254,6 +261,7 @@ export async function runLiveMvpWrites(
   }
 
   return {
+    mode,
     plan,
     results,
     blocked: false,
