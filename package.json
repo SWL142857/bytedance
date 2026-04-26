@@ -14,7 +14,10 @@
     "pipeline:demo": "node --import tsx scripts/demo-pipeline.ts",
     "report:demo": "node --import tsx scripts/demo-report.ts",
     "decision:demo": "node --import tsx scripts/demo-human-decision.ts",
-    "mvp:demo": "node --import tsx scripts/demo-mvp.ts"
+    "mvp:demo": "node --import tsx scripts/demo-mvp.ts",
+    "base:resolve:demo": "node --import tsx scripts/resolve-demo-records.ts",
+    "base:resolve:sample": "node --import tsx scripts/resolve-demo-records.ts --sample-parse",
+    "mvp:live-ready": "node --import tsx scripts/demo-live-ready-mvp.ts"
   },
   "keywords": [
     "recruitment",
