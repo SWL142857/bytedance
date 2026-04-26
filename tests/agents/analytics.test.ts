@@ -189,7 +189,7 @@ describe("analytics agent — schema validation failure", () => {
     });
     const result = await runAnalytics(client, VALID_INPUT);
     assert.equal(result.agentRun.run_status, "failed");
-    assert.ok(result.agentRun.error_message!.includes("Forbidden"));
+    assert.ok(result.agentRun.error_message!.includes("schema") || result.agentRun.error_message!.includes("Schema"));
   });
 
   it("does not generate Report upsert on failure", async () => {

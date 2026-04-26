@@ -1,6 +1,6 @@
 import type { LlmClient } from "../llm/client.js";
 import { parseHrCoordinatorOutput, type HrCoordinatorOutput } from "./schemas.js";
-import { callLlm, computePromptHash, buildAgentRun, type AgentResult } from "./base-agent.js";
+import { computePromptHash, buildAgentRun, completeWithSchemaRetry, type AgentResult } from "./base-agent.js";
 import { updateCandidateStatus, appendAgentRun } from "../base/runtime.js";
 import { assertLarkRecordId } from "../base/record-values.js";
 import type { BaseCommandSpec } from "../base/commands.js";
@@ -33,21 +33,28 @@ export async function runHrCoordinator(
   const inputSummary = buildInputSummary(input);
 
   let parsed: HrCoordinatorOutput = FAILED_OUTPUT;
-  let runStatus: "success" | "failed" = "success";
+  let runStatus: "success" | "failed" | "retried" = "success";
   let errorMessage: string | undefined;
   let durationMs = 0;
+  let retryCount = 0;
 
   try {
-    const { response, durationMs: dur } = await callLlm(client, { promptTemplateId, prompt });
-    durationMs = dur;
-    const raw = JSON.parse(response.content);
-    parsed = parseHrCoordinatorOutput(raw);
+    const result = await completeWithSchemaRetry(
+      client,
+      promptTemplateId,
+      prompt,
+      (raw) => parseHrCoordinatorOutput(raw),
+    );
+    parsed = result.parsed;
+    durationMs = result.durationMs;
+    retryCount = result.retryCount;
+    if (retryCount > 0) runStatus = "retried";
   } catch (err) {
     runStatus = "failed";
     errorMessage = sanitizeErrorMessage(err instanceof Error ? err.message : String(err), input);
   }
 
-  const statusAfter = runStatus === "success" ? "decision_pending" as const : input.fromStatus;
+  const statusAfter = runStatus === "failed" ? input.fromStatus : "decision_pending" as const;
 
   const agentRun = buildAgentRun({
     agentName: "hr_coordinator",
@@ -61,6 +68,7 @@ export async function runHrCoordinator(
     statusAfter,
     runStatus,
     errorMessage,
+    retryCount,
     durationMs,
   });
 
@@ -72,7 +80,7 @@ export async function runHrCoordinator(
     // Audit append must not prevent the rest of the flow
   }
 
-  if (runStatus === "success") {
+  if (runStatus !== "failed") {
     try {
       // Status transition is the last (and only business) write
       commands.push(

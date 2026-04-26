@@ -1,6 +1,6 @@
 import type { LlmClient } from "../llm/client.js";
 import { parseResumeParserOutput, type ResumeParserOutput } from "./schemas.js";
-import { callLlm, computePromptHash, buildAgentRun, type AgentResult } from "./base-agent.js";
+import { computePromptHash, buildAgentRun, completeWithSchemaRetry, type AgentResult } from "./base-agent.js";
 import { upsertRecord, updateCandidateStatus, appendAgentRun } from "../base/runtime.js";
 import { assertLarkRecordId } from "../base/record-values.js";
 import type { BaseCommandSpec } from "../base/commands.js";
@@ -30,15 +30,22 @@ export async function runResumeParser(
   const inputSummary = buildInputSummary(input);
 
   let parsed: ResumeParserOutput = FAILED_OUTPUT;
-  let runStatus: "success" | "failed" = "success";
+  let runStatus: "success" | "failed" | "retried" = "success";
   let errorMessage: string | undefined;
   let durationMs = 0;
+  let retryCount = 0;
 
   try {
-    const { response, durationMs: dur } = await callLlm(client, { promptTemplateId, prompt });
-    durationMs = dur;
-    const raw = JSON.parse(response.content);
-    parsed = parseResumeParserOutput(raw);
+    const result = await completeWithSchemaRetry(
+      client,
+      promptTemplateId,
+      prompt,
+      (raw) => parseResumeParserOutput(raw),
+    );
+    parsed = result.parsed;
+    durationMs = result.durationMs;
+    retryCount = result.retryCount;
+    if (retryCount > 0) runStatus = "retried";
   } catch (err) {
     runStatus = "failed";
     errorMessage = sanitizeErrorMessage(err instanceof Error ? err.message : String(err), input);
@@ -48,12 +55,12 @@ export async function runResumeParser(
   let statusAfter: "new" | "parsed" = input.fromStatus;
 
   // Handle parseStatus=failed from model (schema valid but content says failure)
-  if (runStatus === "success" && parsed.parseStatus === "failed") {
+  if (runStatus !== "failed" && parsed.parseStatus === "failed") {
     runStatus = "failed";
     errorMessage = sanitizeErrorMessage(parsed.errorMessage || "Resume parsing failed", input);
   }
 
-  if (runStatus === "success") {
+  if (runStatus !== "failed") {
     statusAfter = "parsed";
   }
 
@@ -69,6 +76,7 @@ export async function runResumeParser(
     statusAfter,
     runStatus,
     errorMessage,
+    retryCount,
     durationMs,
   });
 
@@ -78,7 +86,7 @@ export async function runResumeParser(
     // Audit append must not prevent the rest of the flow
   }
 
-  if (runStatus === "success") {
+  if (runStatus !== "failed") {
     try {
       for (const fact of parsed.facts) {
         commands.push(

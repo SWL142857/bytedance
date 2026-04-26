@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { runResumeParser, type ResumeParserInput } from "../../src/agents/resume-parser.js";
 import { DeterministicLlmClient } from "../../src/llm/deterministic-client.js";
+import type { LlmClient, LlmResponse } from "../../src/llm/client.js";
 
 const VALID_INPUT: ResumeParserInput = {
   candidateRecordId: "recCand001",
@@ -105,6 +106,38 @@ describe("resume parser agent — successful parse", () => {
 });
 
 describe("resume parser agent — schema validation failure", () => {
+  it("retries invalid JSON once and still generates business commands on success", async () => {
+    const responses = [
+      "not valid json {{{",
+      JSON.stringify({
+        facts: [{ factType: "skill", factText: "TypeScript", sourceExcerpt: null, confidence: "high" }],
+        parseStatus: "success",
+      }),
+    ];
+    const prompts: string[] = [];
+    let callIndex = 0;
+    const client: LlmClient = {
+      async complete(request): Promise<LlmResponse> {
+        prompts.push(request.prompt);
+        const content = responses[callIndex] ?? responses[responses.length - 1]!;
+        callIndex++;
+        return { content, promptTemplateId: request.promptTemplateId };
+      },
+    };
+
+    const result = await runResumeParser(client, VALID_INPUT);
+
+    assert.equal(result.agentRun.run_status, "retried");
+    assert.equal(result.agentRun.retry_count, 1);
+    assert.equal(callIndex, 2);
+    assert.ok(!prompts[1]!.includes(VALID_INPUT.resumeText), "Retry prompt must not include resume text");
+
+    const factCmds = result.commands.filter((c) => c.description.includes("\"Resume Facts\""));
+    assert.equal(factCmds.length, 1);
+    const statusCmd = result.commands.find((c) => c.description.includes("new -> parsed"));
+    assert.ok(statusCmd, "Missing status update command after retry success");
+  });
+
   it("produces failed Agent Run when LLM returns invalid JSON", async () => {
     const client = new DeterministicLlmClient({
       resume_parser_v1: "not valid json {{{",

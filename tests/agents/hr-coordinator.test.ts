@@ -139,7 +139,7 @@ describe("hr coordinator agent — schema validation failure", () => {
     });
     const result = await runHrCoordinator(client, VALID_INPUT);
     assert.equal(result.agentRun.run_status, "failed");
-    assert.ok(result.agentRun.error_message!.includes("Forbidden"));
+    assert.ok(result.agentRun.error_message!.includes("schema") || result.agentRun.error_message!.includes("Schema"));
   });
 
   it("still generates Agent Run on failure", async () => {

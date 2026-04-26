@@ -1,6 +1,6 @@
 import type { LlmClient } from "../llm/client.js";
 import { parseAnalyticsOutput, type AnalyticsOutput } from "./schemas.js";
-import { callLlm, computePromptHash, buildAgentRun, type AgentResult } from "./base-agent.js";
+import { computePromptHash, buildAgentRun, completeWithSchemaRetry, type AgentResult } from "./base-agent.js";
 import { upsertRecord, appendAgentRun } from "../base/runtime.js";
 import type { BaseCommandSpec } from "../base/commands.js";
 import type { CandidateStatus, ScreeningRecommendation } from "../types/state.js";
@@ -53,15 +53,22 @@ export async function runAnalytics(
   const inputSummary = buildInputSummary(input);
 
   let parsed: AnalyticsOutput = FAILED_OUTPUT;
-  let runStatus: "success" | "failed" = "success";
+  let runStatus: "success" | "failed" | "retried" = "success";
   let errorMessage: string | undefined;
   let durationMs = 0;
+  let retryCount = 0;
 
   try {
-    const { response, durationMs: dur } = await callLlm(client, { promptTemplateId, prompt });
-    durationMs = dur;
-    const raw = JSON.parse(response.content);
-    parsed = parseAnalyticsOutput(raw);
+    const result = await completeWithSchemaRetry(
+      client,
+      promptTemplateId,
+      prompt,
+      (raw) => parseAnalyticsOutput(raw),
+    );
+    parsed = result.parsed;
+    durationMs = result.durationMs;
+    retryCount = result.retryCount;
+    if (retryCount > 0) runStatus = "retried";
   } catch (err) {
     runStatus = "failed";
     errorMessage = sanitizeErrorMessage(err instanceof Error ? err.message : String(err));
@@ -77,6 +84,7 @@ export async function runAnalytics(
     promptHash,
     runStatus,
     errorMessage,
+    retryCount,
     durationMs,
   });
 
@@ -88,7 +96,7 @@ export async function runAnalytics(
     // Audit append must not prevent the rest of the flow
   }
 
-  if (runStatus === "success") {
+  if (runStatus !== "failed") {
     try {
       commands.push(
         upsertRecord("reports", {
