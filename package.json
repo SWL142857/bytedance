@@ -33,7 +33,8 @@
     "mvp:live-write:dry-run": "node --import tsx scripts/run-live-mvp-writes.ts",
     "mvp:live-write:execute": "node --import tsx scripts/run-live-mvp-writes.ts --use-readonly-resolution --execute --confirm=EXECUTE_LIVE_MVP_WRITES",
     "mvp:provider-agent-demo": "node --import tsx scripts/run-provider-agent-demo.ts",
-    "mvp:provider-agent-demo:execute": "node --import tsx scripts/run-provider-agent-demo.ts --use-provider --execute --confirm=EXECUTE_PROVIDER_AGENT_DEMO"
+    "mvp:provider-agent-demo:execute": "node --import tsx scripts/run-provider-agent-demo.ts --use-provider --execute --confirm=EXECUTE_PROVIDER_AGENT_DEMO",
+    "mvp:api-boundary-audit": "node --import tsx scripts/demo-api-boundary-release-audit.ts"
   },
   "keywords": [
     "recruitment",

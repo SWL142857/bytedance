@@ -15,6 +15,7 @@ function buildInput(
     liveReadyDemoPassed: true,
     liveRunbookAvailable: true,
     guardedExecuteBlocksWithoutConfig: true,
+    apiBoundaryAuditPassed: true,
     forbiddenTraceScanPassed: true,
     ...overrides,
   };
@@ -127,6 +128,24 @@ describe("buildMvpReleaseGateReport - guarded execute block failed", () => {
   });
 });
 
+describe("buildMvpReleaseGateReport - API boundary audit failed", () => {
+  it("returns needs_review", () => {
+    const report = buildMvpReleaseGateReport(
+      buildInput({ apiBoundaryAuditPassed: false }),
+    );
+    assert.equal(report.status, "needs_review");
+    assert.equal(report.liveSafetyReady, false);
+  });
+
+  it("API boundary audit check is block", () => {
+    const report = buildMvpReleaseGateReport(
+      buildInput({ apiBoundaryAuditPassed: false }),
+    );
+    const audit = report.checks.find((c) => c.name === "API Boundary Audit")!;
+    assert.equal(audit.status, "block");
+  });
+});
+
 describe("buildMvpReleaseGateReport - hard safety flags", () => {
   it("realWritePermittedByReport is always false", () => {
     const report = buildMvpReleaseGateReport(buildInput());
@@ -156,6 +175,7 @@ describe("buildMvpReleaseGateReport - recommended commands", () => {
     assert.ok(cmds.includes("pnpm mvp:live-ready"));
     assert.ok(cmds.includes("pnpm mvp:live-runbook"));
     assert.ok(cmds.includes("pnpm mvp:live-write:dry-run"));
+    assert.ok(cmds.includes("pnpm mvp:api-boundary-audit"));
   });
 });
 

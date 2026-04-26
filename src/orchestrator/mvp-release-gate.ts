@@ -26,6 +26,7 @@ export interface MvpReleaseGateInput {
   liveReadyDemoPassed: boolean;
   liveRunbookAvailable: boolean;
   guardedExecuteBlocksWithoutConfig: boolean;
+  apiBoundaryAuditPassed: boolean;
   forbiddenTraceScanPassed: boolean;
 }
 
@@ -36,6 +37,7 @@ const RECOMMENDED_DEMO_COMMANDS = [
   "pnpm mvp:live-ready",
   "pnpm mvp:live-runbook",
   "pnpm mvp:live-write:dry-run",
+  "pnpm mvp:api-boundary-audit",
 ];
 
 export function buildMvpReleaseGateReport(
@@ -48,6 +50,7 @@ export function buildMvpReleaseGateReport(
     input.liveReadyDemoPassed &&
     input.liveRunbookAvailable &&
     input.guardedExecuteBlocksWithoutConfig &&
+    input.apiBoundaryAuditPassed &&
     input.forbiddenTraceScanPassed;
 
   const checks: MvpReleaseGateCheck[] = [
@@ -106,6 +109,14 @@ export function buildMvpReleaseGateReport(
         ? "No forbidden traces found in repository content."
         : "Forbidden traces detected. Clean repository before release.",
       commandHint: "Run forbidden trace scan (see project config for pattern)",
+    },
+    {
+      name: "API Boundary Audit",
+      status: input.apiBoundaryAuditPassed ? "pass" : "block",
+      summary: input.apiBoundaryAuditPassed
+        ? "API boundary audit passed."
+        : "API boundary audit not passing. Run the audit and resolve boundary findings before release.",
+      commandHint: "pnpm mvp:api-boundary-audit",
     },
   ];
 

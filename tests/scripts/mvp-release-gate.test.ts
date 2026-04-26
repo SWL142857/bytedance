@@ -64,6 +64,7 @@ describe("mvp release gate script - default", () => {
     assert.match(result.stdout, /pnpm mvp:live-ready/);
     assert.match(result.stdout, /pnpm mvp:live-runbook/);
     assert.match(result.stdout, /pnpm mvp:live-write:dry-run/);
+    assert.match(result.stdout, /pnpm mvp:api-boundary-audit/);
   });
 
   it("does not leak sensitive data", () => {
@@ -91,6 +92,7 @@ describe("mvp release gate script - sample-ready", () => {
     assert.match(result.stdout, /\[PASS\] Test Suite:/);
     assert.match(result.stdout, /\[PASS\] Local MVP Demo:/);
     assert.match(result.stdout, /\[PASS\] Forbidden Trace Scan:/);
+    assert.match(result.stdout, /\[PASS\] API Boundary Audit:/);
   });
 
   it("does not leak sensitive data", () => {

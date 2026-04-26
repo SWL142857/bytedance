@@ -49,6 +49,7 @@ function getScenario(): MvpReleaseGateInput {
       liveReadyDemoPassed: true,
       liveRunbookAvailable: true,
       guardedExecuteBlocksWithoutConfig: true,
+      apiBoundaryAuditPassed: true,
       forbiddenTraceScanPassed: true,
     };
   }
@@ -61,6 +62,7 @@ function getScenario(): MvpReleaseGateInput {
       liveReadyDemoPassed: false,
       liveRunbookAvailable: false,
       guardedExecuteBlocksWithoutConfig: true,
+      apiBoundaryAuditPassed: false,
       forbiddenTraceScanPassed: true,
     };
   }
@@ -73,6 +75,7 @@ function getScenario(): MvpReleaseGateInput {
       liveReadyDemoPassed: false,
       liveRunbookAvailable: false,
       guardedExecuteBlocksWithoutConfig: false,
+      apiBoundaryAuditPassed: false,
       forbiddenTraceScanPassed: false,
     };
   }
@@ -84,6 +87,7 @@ function getScenario(): MvpReleaseGateInput {
     liveReadyDemoPassed: true,
     liveRunbookAvailable: true,
     guardedExecuteBlocksWithoutConfig: true,
+    apiBoundaryAuditPassed: false,
     forbiddenTraceScanPassed: false,
   };
 }

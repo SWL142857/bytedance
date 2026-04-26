@@ -93,6 +93,11 @@ const SCRIPTS: ScriptCase[] = [
     script: "scripts/run-provider-agent-demo.ts",
     args: [],
   },
+  {
+    name: "api-boundary-audit",
+    script: "scripts/demo-api-boundary-release-audit.ts",
+    args: [],
+  },
 ];
 
 for (const { name, script, args } of SCRIPTS) {
@@ -121,11 +126,29 @@ describe("final demo output safety - cross-script invariants", () => {
     const realWritePatterns = [
       "Real Write Permitted: true",
       "Real Base Write Allowed: true",
+      "Real Base Writes Permitted: true",
     ];
     for (const { script, args } of SCRIPTS) {
       const result = runScript(script, args);
       assert.equal(result.status, 0);
       for (const pattern of realWritePatterns) {
+        assert.ok(
+          !result.stdout.includes(pattern),
+          `${script} must not report ${pattern}`,
+        );
+      }
+    }
+  });
+
+  it("no script outputs external-model permission as true", () => {
+    const externalModelPatterns = [
+      "External Model Call Permitted: true",
+      "Default External Model Calls Permitted: true",
+    ];
+    for (const { script, args } of SCRIPTS) {
+      const result = runScript(script, args);
+      assert.equal(result.status, 0);
+      for (const pattern of externalModelPatterns) {
         assert.ok(
           !result.stdout.includes(pattern),
           `${script} must not report ${pattern}`,
