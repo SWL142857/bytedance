@@ -72,6 +72,11 @@ const SCRIPTS: ScriptCase[] = [
     script: "scripts/demo-pre-api-freeze-report.ts",
     args: [],
   },
+  {
+    name: "provider-readiness",
+    script: "scripts/demo-provider-adapter-readiness.ts",
+    args: [],
+  },
 ];
 
 for (const { name, script, args } of SCRIPTS) {
