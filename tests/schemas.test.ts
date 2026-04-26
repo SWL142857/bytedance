@@ -4,6 +4,7 @@ import {
   parseResumeParserOutput,
   parseScreeningOutput,
   parseInterviewKitOutput,
+  parseAnalyticsOutput,
   SchemaValidationError,
 } from "../src/agents/schemas.js";
 
@@ -270,5 +271,59 @@ describe("schema parse — sourceExcerpt normalization", () => {
       parseStatus: "success",
     };
     assert.throws(() => parseResumeParserOutput(input), SchemaValidationError);
+  });
+});
+
+describe("schema parse — AnalyticsOutput", () => {
+  const VALID_ANALYTICS_OUTPUT = {
+    funnelSummary: "8 candidates entered pipeline",
+    qualitySummary: "Strong technical depth",
+    bottlenecks: ["Screening drop-off"],
+    talentPoolSuggestions: ["Consider for future roles"],
+    recommendations: ["Add communication assessment"],
+  };
+
+  it("parses valid AnalyticsOutput", () => {
+    const result = parseAnalyticsOutput(VALID_ANALYTICS_OUTPUT);
+    assert.equal(result.funnelSummary, "8 candidates entered pipeline");
+    assert.equal(result.bottlenecks.length, 1);
+  });
+
+  it("rejects unknown key", () => {
+    const input = { ...VALID_ANALYTICS_OUTPUT, extra_field: "oops" };
+    assert.throws(
+      () => parseAnalyticsOutput(input),
+      (err: unknown) => {
+        assert.ok(err instanceof SchemaValidationError);
+        assert.match(err.message, /unknown/i);
+        return true;
+      },
+    );
+  });
+
+  it("rejects forbidden key", () => {
+    const input = { ...VALID_ANALYTICS_OUTPUT, thinking: "secret" };
+    assert.throws(
+      () => parseAnalyticsOutput(input),
+      (err: unknown) => {
+        assert.ok(err instanceof SchemaValidationError);
+        assert.match(err.message, /forbidden/i);
+        return true;
+      },
+    );
+  });
+
+  it("rejects wrong type for bottlenecks", () => {
+    const input = { ...VALID_ANALYTICS_OUTPUT, bottlenecks: "not_array" };
+    assert.throws(() => parseAnalyticsOutput(input), SchemaValidationError);
+  });
+
+  it("rejects wrong type for funnelSummary", () => {
+    const input = { ...VALID_ANALYTICS_OUTPUT, funnelSummary: 123 };
+    assert.throws(() => parseAnalyticsOutput(input), SchemaValidationError);
+  });
+
+  it("rejects non-object input", () => {
+    assert.throws(() => parseAnalyticsOutput("string"), SchemaValidationError);
   });
 });

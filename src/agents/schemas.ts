@@ -6,6 +6,14 @@ export interface HrCoordinatorOutput {
   coordinatorChecklist: string[];
 }
 
+export interface AnalyticsOutput {
+  funnelSummary: string;
+  qualitySummary: string;
+  bottlenecks: string[];
+  talentPoolSuggestions: string[];
+  recommendations: string[];
+}
+
 export interface ResumeParserOutput {
   facts: Array<{
     factType: FactType;
@@ -297,4 +305,34 @@ export function parseHrCoordinatorOutput(value: unknown): HrCoordinatorOutput {
   if (nextStep !== "human_decision") throw new SchemaValidationError(`nextStep must be "human_decision", got "${String(nextStep)}"`);
   const parsedChecklist = parseStringArray(coordinatorChecklist, "coordinatorChecklist");
   return { handoffSummary, nextStep, coordinatorChecklist: parsedChecklist };
+}
+
+// --- Analytics ---
+
+const ANALYTICS_ALLOWED_KEYS = new Set([
+  "funnelSummary", "qualitySummary", "bottlenecks", "talentPoolSuggestions", "recommendations",
+]);
+
+export function parseAnalyticsOutput(value: unknown): AnalyticsOutput {
+  if (!isObject(value)) throw new SchemaValidationError("AnalyticsOutput must be an object");
+  const forbidden = hasForbiddenKeys(value);
+  if (forbidden) throw new SchemaValidationError(`Forbidden key "${forbidden}" in AnalyticsOutput`);
+  for (const key of Object.keys(value)) {
+    if (!ANALYTICS_ALLOWED_KEYS.has(key)) {
+      throw new SchemaValidationError(`Unknown key "${key}" in AnalyticsOutput`);
+    }
+  }
+  const { funnelSummary, qualitySummary, bottlenecks, talentPoolSuggestions, recommendations } = value;
+  if (!isString(funnelSummary)) throw new SchemaValidationError("funnelSummary must be a string");
+  if (!isString(qualitySummary)) throw new SchemaValidationError("qualitySummary must be a string");
+  const parsedBottlenecks = parseStringArray(bottlenecks, "bottlenecks");
+  const parsedTalentPool = parseStringArray(talentPoolSuggestions, "talentPoolSuggestions");
+  const parsedRecommendations = parseStringArray(recommendations, "recommendations");
+  return {
+    funnelSummary,
+    qualitySummary,
+    bottlenecks: parsedBottlenecks,
+    talentPoolSuggestions: parsedTalentPool,
+    recommendations: parsedRecommendations,
+  };
 }
