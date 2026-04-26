@@ -48,6 +48,37 @@ new → parsed → screened → interview_kit_ready → decision_pending → off
 - 允许 Prompt Engineering、Sub-agent、Tool-use；数据量扩大时可引入 RAG。
 - Agent Runs 记录审计依据（输入摘要、输出 JSON、evidence 引用、prompt 版本、状态变更），不记录完整思维链或简历原文。
 
+## 当前开发状态与路线
+
+已完成：
+
+| 阶段 | 状态 | 结果 |
+|------|------|------|
+| MVP deterministic local flow | 完成 | 5 Agent、Human Decision、Pipeline 和 Analytics 可通过 `pnpm mvp:demo` 离线验证 |
+| Live Base guard | 完成 | record resolution、read-only smoke、write plan、guarded live write runner、audit、recovery、verification、runbook 和 release gate 已就绪 |
+| Phase 5.3 | 完成 | disabled provider adapter boundary，默认 fail-closed |
+| Phase 5.4 | 完成 | guarded provider connectivity smoke runner，默认 dry-run |
+| Phase 5.5 | 完成 | guarded OpenAI-compatible provider client，实现 `LlmClient`，默认不接入业务 agents |
+| Phase 5.6 | 完成 | schema retry and safe parse loop，invalid JSON/schema failure 最多安全重试一次 |
+| Phase 5.7 | 完成 | opt-in provider-backed Resume Parser demo，无 Base 写入，默认不外呼 |
+| Phase 5.8 | 完成 | API boundary release audit，并纳入 release gate |
+
+当前开发重点：
+
+| 阶段 | 状态 | 范围 |
+|------|------|------|
+| Phase 6.0 — Safe UI Service And Frontend Shell | 进行中 | 新增安全本地 service layer 和静态前端 shell，只展示 safe summary，不接真实 provider，不写 Base，不提供 execute 操作 |
+| Phase 6.1 — Operator Console Controls | 待定 | 在 6.0 安全边界稳定后，为 dry-run/readiness/report runner 增加 UI 操作入口；真实 execute 仍默认禁用 |
+| Phase 6.2 — Partner Data Contract | 待定 | 与数据/RAG 侧对齐 `JobContext`、`CandidateProfile`、`RetrievedEvidence[]`、`AgentInputBundle` 等接口，先 mock 后替换 |
+
+Phase 6.0 的最低验收边界：
+
+- 前端只能消费 `src/server/` 暴露的安全 JSON，不能直接读取 env、调用 provider client 或执行 Base command。
+- 服务层必须统一过滤 command args、payload、authorization header、raw response、prompt、resume text、真实 endpoint/model ID/API key 和 Base record ID。
+- UI 首屏展示 Pipeline summary、Agent Runs timeline、Provider Readiness、MVP Release Gate、API Boundary Audit。
+- 所有 execute 操作延后，当前 UI 只允许展示 dry-run/readiness/report 结果。
+- 原有 CLI 验证链路必须保持不变：`pnpm typecheck`、`pnpm test`、`pnpm build`、`pnpm mvp:demo`、`pnpm mvp:release-gate`、`pnpm mvp:api-boundary-audit`。
+
 ## Base Runtime
 
 Agent 不直接拼接或执行 `lark-cli` 命令，统一通过 `src/base/runtime.ts` 生成 typed command plan，再交给 `runPlan()` 执行。这样可以集中处理 dry-run 默认行为、写入守卫、字段值校验和状态机校验。
@@ -87,6 +118,12 @@ Provider Adapter Readiness（`pnpm mvp:provider-readiness`）展示 provider ada
 Provider Connectivity Smoke（`pnpm mvp:provider-smoke`）dry-run 默认不发起外部模型调用，只说明需要哪些环境变量。真实连通性测试必须显式 `pnpm mvp:provider-smoke:execute`，并满足 `--execute` + `--confirm=EXECUTE_PROVIDER_SMOKE` + 本地 `MODEL_API_ENDPOINT` / `MODEL_ID` / `MODEL_API_KEY` 齐全。Smoke 只发送固定安全 prompt（"ping"），不发送简历文本、JD 或 Base record ID。输出只包含 redacted summary（status、httpStatus、hasChoices、contentLength、durationMs、errorKind），不包含 endpoint、apiKey、modelId、request payload、authorization header 或 raw response。此工具只用于人工确认 provider 可达，不代表业务 agent 已接入模型。不要把 key、model ID、endpoint 或 raw response 放进日志、issue 或 commit。
 
 Provider Client Implementation（Phase 5.5）增加了 `OpenAICompatibleClient`，实现了 `LlmClient` 接口，可向 OpenAI-compatible endpoint 发送 `POST /chat/completions` 请求。该 client 通过 `buildProviderAdapterReadiness` 守卫，默认 disabled/blocked 时不调用任何外部 API；只在 config 完整且 enabled 时才发起请求。当前默认 demos（`pnpm mvp:demo`、`pnpm pipeline:demo` 等）仍使用 `DeterministicLlmClient`，业务 agents 不直接 import `OpenAICompatibleClient`。真实 provider client 只是后续 opt-in agent demo 的基础。所有测试均 mock fetch，不允许真实网络调用。Provider 错误映射为安全错误类型，不透传 raw body、apiKey、endpoint 或 modelId。
+
+Schema Retry（Phase 5.6）为所有业务 agents 增加 shared safe parse loop：首次模型输出 JSON parse 或 schema validation 失败时，最多重试一次。retry prompt 使用固定安全说明，不包含完整原 prompt、简历、JD、raw model output、payload、endpoint、model ID 或 API key。重试仍失败时写入安全错误摘要，不透传原始模型输出。
+
+Provider Agent Demo（Phase 5.7）提供 opt-in provider-backed Resume Parser demo。默认 `pnpm mvp:provider-agent-demo` 只是 dry-run plan，不调用外部模型。真实执行必须同时满足 `--use-provider`、`--execute`、确认短语 `EXECUTE_PROVIDER_AGENT_DEMO` 和完整 provider env。该 demo 只生成 command plan，不写 Base，不输出 prompt、resume text、raw model output、endpoint、model ID、API key、payload、authorization header 或 Base record ID。
+
+API Boundary Release Audit（Phase 5.8，`pnpm mvp:api-boundary-audit`）审计 provider/API 接入没有削弱默认安全边界：默认 demos 不外呼模型，provider smoke 和 provider agent demo 都需要显式 execute + confirm，Base 写入守卫保持独立，demo 输出不包含敏感数据，release gate 能反映 API boundary 状态。该 audit 不执行真实 provider 调用，也不写 Base。
 
 ## 模型 API 本地配置
 
@@ -129,6 +166,9 @@ src/
   orchestrator/   — 状态机和 pipeline 编排
   agents/         — Agent 输出 schema 和校验
   base/           — 飞书 Base 表结构常量定义
+  llm/            — deterministic client、provider adapter/client 和 guarded provider runners
+  server/         — Phase 6.0 计划新增：安全本地 UI service layer
+  ui/             — Phase 6.0 计划新增：静态前端 shell
 tests/            — 纯逻辑测试
 ```
 
