@@ -88,6 +88,11 @@ const SCRIPTS: ScriptCase[] = [
     script: "scripts/run-provider-smoke.ts",
     args: [],
   },
+  {
+    name: "provider-agent-demo",
+    script: "scripts/run-provider-agent-demo.ts",
+    args: [],
+  },
 ];
 
 for (const { name, script, args } of SCRIPTS) {
