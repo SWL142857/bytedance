@@ -80,6 +80,8 @@ Live Operator Runbook（`pnpm mvp:live-runbook`）把 readiness、dry-run、huma
 
 MVP Release Gate（`pnpm mvp:release-gate`）生成最终交付检查清单，确认 typecheck、tests、local demo、live safety tools 和 trace scan 全部通过。它不会运行真实写入，也不会调用模型 API。推荐 demo 流程：typecheck → test → local demo → live-ready → runbook → dry-run。真实写入仍必须人工明确授权，并走 guarded runner。
 
+Pre-API Freeze Report（`pnpm mvp:pre-api-freeze`）生成接入真实模型 API 前的架构冻结报告，确认 Agent 输出 schema、状态机、Base 写入守卫和 redaction policy 已锁定，deterministic demo 和 release gate 通过，LLM adapter 边界已定义。API 接入只能在 provider adapter / config validation / error mapping / schema retry wiring 层发生，不能改业务逻辑、放松写入守卫或绕过 schema 校验。默认仍不允许外呼模型或真实写 Base。
+
 ## 运行方式
 
 > **注意：本项目尚在开发中。** 以下为预期的运行方式，当前不代表系统已可真实运行。

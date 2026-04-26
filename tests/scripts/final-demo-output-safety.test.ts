@@ -67,6 +67,11 @@ const SCRIPTS: ScriptCase[] = [
     script: "scripts/demo-live-ready-mvp.ts",
     args: [],
   },
+  {
+    name: "pre-api-freeze",
+    script: "scripts/demo-pre-api-freeze-report.ts",
+    args: [],
+  },
 ];
 
 for (const { name, script, args } of SCRIPTS) {
@@ -92,13 +97,19 @@ for (const { name, script, args } of SCRIPTS) {
 
 describe("final demo output safety - cross-script invariants", () => {
   it("no script outputs real-write permission as true", () => {
+    const realWritePatterns = [
+      "Real Write Permitted: true",
+      "Real Base Write Allowed: true",
+    ];
     for (const { script, args } of SCRIPTS) {
       const result = runScript(script, args);
       assert.equal(result.status, 0);
-      assert.ok(
-        !result.stdout.includes("Real Write Permitted: true"),
-        `${script} must not report real-write permitted`,
-      );
+      for (const pattern of realWritePatterns) {
+        assert.ok(
+          !result.stdout.includes(pattern),
+          `${script} must not report ${pattern}`,
+        );
+      }
     }
   });
 });
