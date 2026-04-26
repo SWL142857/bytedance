@@ -12,7 +12,9 @@
     "base:seed:dry-run": "node --import tsx scripts/seed-base.ts",
     "base:seed:execute": "node --import tsx scripts/seed-base.ts --execute",
     "pipeline:demo": "node --import tsx scripts/demo-pipeline.ts",
-    "report:demo": "node --import tsx scripts/demo-report.ts"
+    "report:demo": "node --import tsx scripts/demo-report.ts",
+    "decision:demo": "node --import tsx scripts/demo-human-decision.ts",
+    "mvp:demo": "node --import tsx scripts/demo-mvp.ts"
   },
   "keywords": [
     "recruitment",
