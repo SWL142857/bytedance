@@ -84,6 +84,8 @@ Pre-API Freeze Report（`pnpm mvp:pre-api-freeze`）生成接入真实模型 API
 
 Provider Adapter Readiness（`pnpm mvp:provider-readiness`）展示 provider adapter 当前 readiness 状态。当前 provider adapter 是 disabled/fail-closed boundary，定义了接口、配置校验和错误映射，但默认不做任何外部网络调用。火山方舟接入边界要求 provider、endpoint、model ID 和 API key 配置齐全，但 demo 输出会隐藏具体 endpoint、model ID 和 key。真实 API 接入必须在后续阶段实现，并且必须保留 pre-api freeze 的 schema/state/write/redaction 边界。
 
+Provider Connectivity Smoke（`pnpm mvp:provider-smoke`）dry-run 默认不发起外部模型调用，只说明需要哪些环境变量。真实连通性测试必须显式 `pnpm mvp:provider-smoke:execute`，并满足 `--execute` + `--confirm=EXECUTE_PROVIDER_SMOKE` + 本地 `MODEL_API_ENDPOINT` / `MODEL_ID` / `MODEL_API_KEY` 齐全。Smoke 只发送固定安全 prompt（"ping"），不发送简历文本、JD 或 Base record ID。输出只包含 redacted summary（status、httpStatus、hasChoices、contentLength、durationMs、errorKind），不包含 endpoint、apiKey、modelId、request payload、authorization header 或 raw response。此工具只用于人工确认 provider 可达，不代表业务 agent 已接入模型。不要把 key、model ID、endpoint 或 raw response 放进日志、issue 或 commit。
+
 ## 模型 API 本地配置
 
 真实模型凭证只能放在本地环境文件或部署平台的 secret manager 中，不能提交到 GitHub。推荐流程：

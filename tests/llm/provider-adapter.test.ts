@@ -151,6 +151,12 @@ describe("mapProviderAdapterError", () => {
     assert.equal(err.retryable, true);
   });
 
+  it("maps abort error as timeout", () => {
+    const err = mapProviderAdapterError(new DOMException("The operation was aborted", "AbortError"));
+    assert.equal(err.kind, "timeout");
+    assert.equal(err.retryable, true);
+  });
+
   it("maps rate limit / 429 error", () => {
     const err = mapProviderAdapterError(new Error("HTTP 429 rate limit exceeded"));
     assert.equal(err.kind, "rate_limited");

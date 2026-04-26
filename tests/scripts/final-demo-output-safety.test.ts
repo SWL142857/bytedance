@@ -8,6 +8,9 @@ function runScript(script: string, args: string[] = []) {
   delete env.LARK_APP_SECRET;
   delete env.BASE_APP_TOKEN;
   delete env.HIRELOOP_ALLOW_LARK_WRITE;
+  delete env.MODEL_API_ENDPOINT;
+  delete env.MODEL_ID;
+  delete env.MODEL_API_KEY;
 
   return spawnSync(
     process.execPath,
@@ -32,6 +35,9 @@ const SENSITIVE_PATTERNS = [
   "stdout",
   "raw stderr",
   "mvp:live-write:execute",
+  "MODEL_API_ENDPOINT",
+  "MODEL_ID",
+  "MODEL_API_KEY",
 ] as const;
 
 function assertNoSensitiveData(label: string, output: string): void {
@@ -75,6 +81,11 @@ const SCRIPTS: ScriptCase[] = [
   {
     name: "provider-readiness",
     script: "scripts/demo-provider-adapter-readiness.ts",
+    args: [],
+  },
+  {
+    name: "provider-smoke",
+    script: "scripts/run-provider-smoke.ts",
     args: [],
   },
 ];

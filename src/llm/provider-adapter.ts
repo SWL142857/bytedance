@@ -76,9 +76,22 @@ export function buildProviderAdapterReadiness(
 
 export function mapProviderAdapterError(error: unknown): ProviderAdapterError {
   if (error instanceof Error) {
+    if (error.name === "AbortError") {
+      return {
+        kind: "timeout",
+        retryable: true,
+        safeMessage: "Provider request timed out.",
+      };
+    }
+
     const msg = error.message.toLowerCase();
 
-    if (msg.includes("timeout") || msg.includes("timed out") || msg.includes("etimedout")) {
+    if (
+      msg.includes("timeout") ||
+      msg.includes("timed out") ||
+      msg.includes("etimedout") ||
+      msg.includes("aborted")
+    ) {
       return {
         kind: "timeout",
         retryable: true,
