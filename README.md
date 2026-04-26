@@ -78,6 +78,8 @@ Live Post-Write Verification Report（`pnpm mvp:live-verification`）用于 live
 
 Live Operator Runbook（`pnpm mvp:live-runbook`）把 readiness、dry-run、human approval、execute、recovery、verification 串成人工可执行的 live 操作手册摘要。它只是安全门和执行清单，不会自动执行真实写入。Live 执行前应先看 readiness + dry-run，执行后看 audit + recovery + verification。失败后不要盲目重跑整链路。
 
+MVP Release Gate（`pnpm mvp:release-gate`）生成最终交付检查清单，确认 typecheck、tests、local demo、live safety tools 和 trace scan 全部通过。它不会运行真实写入，也不会调用模型 API。推荐 demo 流程：typecheck → test → local demo → live-ready → runbook → dry-run。真实写入仍必须人工明确授权，并走 guarded runner。
+
 ## 运行方式
 
 > **注意：本项目尚在开发中。** 以下为预期的运行方式，当前不代表系统已可真实运行。
