@@ -24,6 +24,7 @@
     "mvp:live-readiness": "node --import tsx scripts/demo-live-readiness-report.ts",
     "mvp:live-recovery": "node --import tsx scripts/demo-live-recovery-plan.ts",
     "mvp:live-verification": "node --import tsx scripts/demo-live-verification-report.ts",
+    "mvp:live-runbook": "node --import tsx scripts/demo-live-operator-runbook.ts",
     "mvp:live-write:dry-run": "node --import tsx scripts/run-live-mvp-writes.ts",
     "mvp:live-write:execute": "node --import tsx scripts/run-live-mvp-writes.ts --use-readonly-resolution --execute --confirm=EXECUTE_LIVE_MVP_WRITES"
   },

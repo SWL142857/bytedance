@@ -76,6 +76,8 @@ Live Recovery Plan（`pnpm mvp:live-recovery`）根据 execution audit 生成结
 
 Live Post-Write Verification Report（`pnpm mvp:live-verification`）用于 live write 执行后核验 Base 中关键结果是否存在且状态合理。默认 sample/offline，不执行写入。真正 live 后应结合 readiness、execution audit、recovery plan 和 verification report 做人工确认。
 
+Live Operator Runbook（`pnpm mvp:live-runbook`）把 readiness、dry-run、human approval、execute、recovery、verification 串成人工可执行的 live 操作手册摘要。它只是安全门和执行清单，不会自动执行真实写入。Live 执行前应先看 readiness + dry-run，执行后看 audit + recovery + verification。失败后不要盲目重跑整链路。
+
 ## 运行方式
 
 > **注意：本项目尚在开发中。** 以下为预期的运行方式，当前不代表系统已可真实运行。
