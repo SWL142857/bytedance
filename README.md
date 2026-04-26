@@ -74,6 +74,8 @@ Live Readiness Report（`pnpm mvp:live-readiness`）在真实写入前做只读 
 
 Live Recovery Plan（`pnpm mvp:live-recovery`）根据 execution audit 生成结构化失败恢复计划，评估风险等级和已写入命令数，给出人工核对清单和重跑策略。失败后不要盲目重跑整链路，先用 audit 和 recovery plan 做人工核对和定向补偿判断。
 
+Live Post-Write Verification Report（`pnpm mvp:live-verification`）用于 live write 执行后核验 Base 中关键结果是否存在且状态合理。默认 sample/offline，不执行写入。真正 live 后应结合 readiness、execution audit、recovery plan 和 verification report 做人工确认。
+
 ## 运行方式
 
 > **注意：本项目尚在开发中。** 以下为预期的运行方式，当前不代表系统已可真实运行。
