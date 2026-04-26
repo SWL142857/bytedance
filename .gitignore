@@ -18,10 +18,10 @@ dist/
 # OS
 .DS_Store
 Thumbs.db
-CLAUDE.md
-docs/prompts/
-docs/implementation/
-docs/superpowers/
+
+# Local development-only notes
+?LAUDE.md
+docs/
 
 # Logs
 *.log
