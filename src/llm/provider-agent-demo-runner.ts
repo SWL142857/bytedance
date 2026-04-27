@@ -35,18 +35,10 @@ export interface ProviderAgentDemoOptions {
 
 const REQUIRED_CONFIRM = "EXECUTE_PROVIDER_AGENT_DEMO";
 
-const SAMPLE_RESUME_PARSER_INPUT: ResumeParserInput = {
-  candidateRecordId: "rec_demo_candidate_001",
-  candidateId: "cand_demo_001",
-  resumeText:
-    "AI Product Manager with 6 years experience in technology sector. " +
-    "Skills: product roadmapping, SQL, Python basics, A/B testing.",
-  fromStatus: "new",
-};
-
 export function buildProviderAgentDemoPlan(
   config: ProviderAdapterConfig,
   options: ProviderAgentDemoOptions,
+  input?: ResumeParserInput | null,
 ): ProviderAgentDemoResult {
   if (!options.useProvider && !options.execute) {
     return {
@@ -96,6 +88,10 @@ export function buildProviderAgentDemoPlan(
   }
 
   const blocked = buildExecuteBlockedReasons(config, readiness, options);
+  if (!input) {
+    blocked.push("Resume parser input is required.");
+  }
+
   if (blocked.length > 0) {
     return {
       mode: "execute",
@@ -129,8 +125,9 @@ export async function runProviderAgentDemo(
   config: ProviderAdapterConfig,
   options: ProviderAgentDemoOptions,
   clientOverride?: LlmClient,
+  input?: ResumeParserInput | null,
 ): Promise<ProviderAgentDemoResult> {
-  const plan = buildProviderAgentDemoPlan(config, options);
+  const plan = buildProviderAgentDemoPlan(config, options, input);
 
   if (plan.status !== "planned" || plan.mode !== "execute") {
     return plan;
@@ -140,7 +137,7 @@ export async function runProviderAgentDemo(
 
   try {
     const client = clientOverride ?? new OpenAICompatibleClient({ config });
-    const result = await runResumeParser(client, SAMPLE_RESUME_PARSER_INPUT);
+    const result = await runResumeParser(client, input as ResumeParserInput);
     const durationMs = Date.now() - start;
     const completed = result.agentRun.run_status !== "failed";
 

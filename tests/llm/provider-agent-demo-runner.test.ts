@@ -31,6 +31,15 @@ const SAMPLE_RESUME_TEXT =
   "AI Product Manager with 6 years experience in technology sector. " +
   "Skills: product roadmapping, SQL, Python basics, A/B testing.";
 
+function makeResumeParserInput() {
+  return {
+    candidateRecordId: "recCandidate001",
+    candidateId: "cand_001",
+    resumeText: SAMPLE_RESUME_TEXT,
+    fromStatus: "new" as const,
+  };
+}
+
 function makeMockLlmClient(content: string): LlmClient {
   return {
     async complete(request: { promptTemplateId: string; prompt: string }): Promise<LlmResponse> {
@@ -176,7 +185,7 @@ describe("Provider agent demo — execute success with mock provider", () => {
     });
     const client = makeMockLlmClient(validOutput);
 
-    const result = await runProviderAgentDemo(makeReadyConfig(), makeExecuteOptions(), client);
+    const result = await runProviderAgentDemo(makeReadyConfig(), makeExecuteOptions(), client, makeResumeParserInput());
 
     assert.equal(result.status, "success");
     assert.equal(result.mode, "execute");
@@ -192,7 +201,7 @@ describe("Provider agent demo — execute success with mock provider", () => {
     });
     const client = makeMockLlmClient(validOutput);
 
-    const result = await runProviderAgentDemo(makeReadyConfig(), makeExecuteOptions(), client);
+    const result = await runProviderAgentDemo(makeReadyConfig(), makeExecuteOptions(), client, makeResumeParserInput());
     const json = JSON.stringify(result);
 
     assert.ok(!json.includes("sk-test-key-12345"), "no apiKey");
@@ -208,7 +217,7 @@ describe("Provider agent demo — execute with agent failure", () => {
   it("mocked provider returning invalid JSON fails safely", async () => {
     const client = makeMockLlmClient("not valid json {{{");
 
-    const result = await runProviderAgentDemo(makeReadyConfig(), makeExecuteOptions(), client);
+    const result = await runProviderAgentDemo(makeReadyConfig(), makeExecuteOptions(), client, makeResumeParserInput());
 
     assert.equal(result.status, "failed");
     assert.equal(result.mode, "execute");
@@ -219,7 +228,7 @@ describe("Provider agent demo — execute with agent failure", () => {
   it("failure agent result does not leak secrets", async () => {
     const client = makeMockLlmClient("bad json");
 
-    const result = await runProviderAgentDemo(makeReadyConfig(), makeExecuteOptions(), client);
+    const result = await runProviderAgentDemo(makeReadyConfig(), makeExecuteOptions(), client, makeResumeParserInput());
     const json = JSON.stringify(result);
 
     assert.ok(!json.includes("sk-test-key-12345"), "no apiKey in failure");
@@ -231,7 +240,7 @@ describe("Provider agent demo — execute with agent failure", () => {
     const rawSecretOutput = "raw-secret-model-output-with-sensitive-data";
     const client = makeMockLlmClient(rawSecretOutput);
 
-    const result = await runProviderAgentDemo(makeReadyConfig(), makeExecuteOptions(), client);
+    const result = await runProviderAgentDemo(makeReadyConfig(), makeExecuteOptions(), client, makeResumeParserInput());
     const json = JSON.stringify(result);
 
     assert.ok(!json.includes(rawSecretOutput), "no raw model output in failure");
@@ -245,13 +254,24 @@ describe("Provider agent demo — execute with agent failure", () => {
       },
     };
 
-    const result = await runProviderAgentDemo(makeReadyConfig(), makeExecuteOptions(), client);
+    const result = await runProviderAgentDemo(makeReadyConfig(), makeExecuteOptions(), client, makeResumeParserInput());
     const json = JSON.stringify(result);
 
     assert.equal(result.status, "failed");
     assert.ok(!json.includes("sk-test-key-12345"), "no apiKey in thrown failure");
     assert.ok(!json.includes("api.test.example.com"), "no endpoint in thrown failure");
     assert.ok(!json.includes("ep-test-model"), "no modelId in thrown failure");
+  });
+
+  it("missing input blocks execute safely", async () => {
+    const result = await runProviderAgentDemo(
+      makeReadyConfig(),
+      makeExecuteOptions(),
+      makeMockLlmClient("{}"),
+    );
+
+    assert.equal(result.status, "blocked");
+    assert.ok(result.blockedReasons.some((reason) => reason.includes("input")));
   });
 });
 
@@ -287,7 +307,7 @@ describe("Provider agent demo — output safety", () => {
     });
     const client = makeMockLlmClient(validOutput);
 
-    const result = await runProviderAgentDemo(makeReadyConfig(), makeExecuteOptions(), client);
+    const result = await runProviderAgentDemo(makeReadyConfig(), makeExecuteOptions(), client, makeResumeParserInput());
     const json = JSON.stringify(result);
 
     assert.ok(!json.includes("rec_demo"), "no demo record IDs");

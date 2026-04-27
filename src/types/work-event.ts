@@ -53,6 +53,7 @@ export interface SafeLinkView {
   link_label: string;
   link_type: WorkEventLinkType;
   available: boolean;
+  unavailable_label: string | null;
 }
 
 export interface SafeWorkEventView {
@@ -92,9 +93,22 @@ export interface OrgOverviewSafetyView {
   demo_mode: boolean;
 }
 
+export type DataSourceMode = "runtime_snapshot" | "demo_fixture";
+export type SnapshotSource = "deterministic" | "provider";
+
+export interface DataSourceView {
+  mode: DataSourceMode;
+  snapshot_source: SnapshotSource | null;
+  label: string;
+  generated_at: string | null;
+  external_model_calls: boolean;
+  real_writes: false;
+}
+
 export interface OrgOverviewView {
   agents: OrgOverviewAgentView[];
   pipeline: OrgOverviewPipelineView;
   recent_events: SafeWorkEventView[];
   safety: OrgOverviewSafetyView;
+  data_source: DataSourceView;
 }

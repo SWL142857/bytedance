@@ -21,13 +21,14 @@
         <span class="brand-tag">操作员控制台</span>
       </div>
       <div class="header-actions">
-        <span class="mode-pill">演示模式 · 只读</span>
+        <span class="mode-pill" id="mode-pill">加载中</span>
         <span class="header-time" id="header-time">—</span>
       </div>
     </div>
   </header>
 
   <main>
+    <!-- Hero: KPI strip -->
     <section class="hero anim-fade-up delay-1">
       <div class="hero-head">
         <div>
@@ -40,110 +41,90 @@
         </div>
       </div>
       <div class="kpi-grid" id="kpi-grid">
-        <div class="kpi-card"><div class="loading-pulse">加载中</div></div>
+        <div class="loading-pulse">加载中</div>
       </div>
     </section>
 
-    <section class="anim-fade-up delay-2">
-      <div class="section-label">
-        <span class="section-label-bar"></span>
-        <span class="section-label-text">组织运行总览</span>
-        <span class="section-label-hint">五位虚拟员工 · 实时状态与近况</span>
-      </div>
-      <div id="org-overview-container">
-        <div class="loading-pulse">正在加载组织总览</div>
-      </div>
-    </section>
+    <!-- Bento Dashboard -->
+    <div class="bento anim-fade-up delay-2">
+      <!-- Left column (~65%) -->
+      <div class="bento-left">
+        <section>
+          <div class="section-label">
+            <span class="section-label-bar"></span>
+            <span class="section-label-text">候选人流水线</span>
+            <span class="section-label-hint">自简历投递至人工决策的全过程</span>
+          </div>
+          <div id="pipeline-container" class="panel">
+            <div class="loading-pulse">正在初始化流水线</div>
+          </div>
+        </section>
 
-    <section class="anim-fade-up delay-3">
-      <div class="section-label">
-        <span class="section-label-bar"></span>
-        <span class="section-label-text">候选人流水线</span>
-        <span class="section-label-hint">自简历投递至人工决策的全过程</span>
+        <section>
+          <div class="section-label">
+            <span class="section-label-bar"></span>
+            <span class="section-label-text">组织运行总览</span>
+            <span class="section-label-hint">五位虚拟员工 · 实时状态与近况</span>
+          </div>
+          <div id="org-overview-container">
+            <div class="loading-pulse">正在加载组织总览</div>
+          </div>
+        </section>
       </div>
-      <div id="pipeline-container" class="panel">
-        <div class="loading-pulse">正在初始化流水线</div>
-      </div>
-    </section>
 
-    <section class="anim-fade-up delay-4">
-      <div class="section-label">
-        <span class="section-label-bar"></span>
-        <span class="section-label-text">最近活动</span>
-        <span class="section-label-hint">虚拟员工协作时事 · 仅展示安全摘要</span>
-      </div>
-      <div id="work-events-container">
-        <div class="loading-pulse">正在加载最近活动</div>
-      </div>
-      <div id="work-events-message" class="link-message" hidden></div>
-    </section>
+      <!-- Right column (~35%) -->
+      <div class="bento-right">
+        <section>
+          <div class="section-label">
+            <span class="section-label-bar"></span>
+            <span class="section-label-text">最近活动</span>
+            <span class="section-label-hint">虚拟员工协作时事 · 仅展示安全摘要</span>
+          </div>
+          <div id="work-events-container">
+            <div class="loading-pulse">正在加载最近活动</div>
+          </div>
+          <div id="work-events-message" class="link-message" hidden></div>
+        </section>
 
-    <section class="anim-fade-up delay-5">
-      <div class="section-label">
-        <span class="section-label-bar"></span>
-        <span class="section-label-text">操作员任务清单</span>
-        <span class="section-label-hint">当前为只读 · 真实执行须人工授权</span>
-      </div>
-      <div id="operator-tasks-container">
-        <div class="loading-pulse">正在加载任务清单</div>
-      </div>
-    </section>
+        <section>
+          <div class="section-label">
+            <span class="section-label-bar"></span>
+            <span class="section-label-text">操作员任务清单</span>
+            <span class="section-label-hint">当前为只读 · 真实执行须人工授权</span>
+          </div>
+          <div id="operator-tasks-container">
+            <div class="loading-pulse">正在加载任务清单</div>
+          </div>
+        </section>
 
-    <section class="anim-fade-up delay-6">
-      <div class="section-label">
-        <span class="section-label-bar"></span>
-        <span class="section-label-text">安全检查与审计</span>
-        <span class="section-label-hint">交付门禁 · 边界审计 · 架构冻结 · 写入就绪</span>
-      </div>
-      <div class="reports-grid">
-        <div class="report-card">
-          <div class="card-header"><span class="card-header-dot"></span>交付检查</div>
-          <div id="release-gate-content"><div class="loading-pulse">加载中</div></div>
-        </div>
-        <div class="report-card">
-          <div class="card-header"><span class="card-header-dot"></span>API 边界审计</div>
-          <div id="api-audit-content"><div class="loading-pulse">加载中</div></div>
-        </div>
-        <div class="report-card">
-          <div class="card-header"><span class="card-header-dot"></span>架构冻结</div>
-          <div id="pre-api-freeze-content"><div class="loading-pulse">加载中</div></div>
-        </div>
-        <div class="report-card">
-          <div class="card-header"><span class="card-header-dot"></span>在线写入就绪</div>
-          <div id="live-readiness-content"><div class="loading-pulse">加载中</div></div>
+        <!-- System Console Entry (collapsed) -->
+        <div class="console-entry panel" id="console-entry">
+          <div class="console-entry-head">
+            <div class="console-entry-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><path d="M12 3 4 6v6c0 4.5 3.5 7.8 8 9 4.5-1.2 8-4.5 8-9V6l-8-3z"/><path d="m9 12 2 2 4-4"/></svg>
+            </div>
+            <div class="console-entry-text">
+              <div class="console-entry-title">系统控制台</div>
+              <div class="console-entry-summary" id="console-summary">安全检查 · 模型状态 · 合规审计</div>
+              <div class="section-source-hint">本地安全报告，不来自运行快照</div>
+            </div>
+            <span class="console-entry-badge" id="console-badge">全部正常</span>
+          </div>
+          <button type="button" class="console-entry-btn" id="console-open-btn">查看合规详情</button>
         </div>
       </div>
-    </section>
+    </div>
 
-    <section class="anim-fade-up delay-7">
-      <div class="section-label">
-        <span class="section-label-bar"></span>
-        <span class="section-label-text">模型接入状态</span>
-        <span class="section-label-hint">供应商就绪 · 连通试探 · 代理演练</span>
-      </div>
-      <div class="provider-grid">
-        <div class="provider-card">
-          <div class="card-header"><span class="card-header-dot"></span>就绪状态</div>
-          <div id="provider-readiness-content"><div class="loading-pulse">加载中</div></div>
-        </div>
-        <div class="provider-card">
-          <div class="card-header"><span class="card-header-dot"></span>连通测试</div>
-          <div id="provider-smoke-content"><div class="loading-pulse">加载中</div></div>
-        </div>
-        <div class="provider-card">
-          <div class="card-header"><span class="card-header-dot"></span>Agent 演示</div>
-          <div id="provider-agent-demo-content"><div class="loading-pulse">加载中</div></div>
-        </div>
-      </div>
-    </section>
-
-    <section id="virtual-runs-shadow" hidden>
-      <div class="section-label">
-        <span class="section-label-bar"></span>
-        <span class="section-label-text">虚拟员工动态</span>
-      </div>
-      <div id="agent-runs-container"></div>
-    </section>
+    <!-- Hidden: report data containers (consumed by JS, not visible as sections) -->
+    <div hidden>
+      <div id="release-gate-content"></div>
+      <div id="api-audit-content"></div>
+      <div id="pre-api-freeze-content"></div>
+      <div id="live-readiness-content"></div>
+      <div id="provider-readiness-content"></div>
+      <div id="provider-smoke-content"></div>
+      <div id="provider-agent-demo-content"></div>
+    </div>
   </main>
 
   <footer>
@@ -154,21 +135,69 @@
         <span class="footer-pill">无执行操作</span>
         <span class="footer-pill pill-info">飞书 Base 协同</span>
       </div>
-      <div class="footer-meta">职链 HireLoop · 演示数据脱敏 · 二〇二六</div>
+      <div class="footer-meta" id="footer-meta">职链 HireLoop · 演示数据脱敏 · 二〇二六</div>
     </div>
   </footer>
 
+  <!-- Intro overlay -->
   <div id="intro-overlay" class="intro-overlay">
     <div class="intro-mark">职</div>
     <div class="intro-text">职链 HireLoop · 操作员控制台</div>
     <div class="intro-bar"><div class="intro-bar-fill"></div></div>
   </div>
 
+  <!-- Live capsule -->
   <div id="live-capsule" class="live-capsule" hidden>
     <span class="live-capsule-badge"><span class="live-capsule-dot"></span>在线</span>
     <span class="live-capsule-text">—</span>
     <span class="live-capsule-progress"><span class="live-capsule-progress-fill"></span></span>
   </div>
+
+  <!-- System Console Drawer -->
+  <div class="drawer-backdrop" id="drawer-backdrop" hidden></div>
+  <aside class="drawer" id="console-drawer" role="dialog" aria-modal="true" aria-label="系统控制台" hidden>
+    <div class="drawer-header">
+      <div class="drawer-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" style="width:18px;height:18px"><path d="M12 3 4 6v6c0 4.5 3.5 7.8 8 9 4.5-1.2 8-4.5 8-9V6l-8-3z"/><path d="m9 12 2 2 4-4"/></svg>
+        <span>系统控制台 · 安全检查与审计</span>
+      </div>
+      <button type="button" class="drawer-close" id="drawer-close-btn" aria-label="关闭">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" style="width:18px;height:18px"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    </div>
+    <div class="drawer-body">
+      <div class="drawer-section">
+        <div class="drawer-section-label">交付检查</div>
+        <div class="drawer-section-body panel" id="drawer-release-gate"></div>
+      </div>
+      <div class="drawer-section">
+        <div class="drawer-section-label">API 边界审计</div>
+        <div class="drawer-section-body panel" id="drawer-api-audit"></div>
+      </div>
+      <div class="drawer-section">
+        <div class="drawer-section-label">架构冻结</div>
+        <div class="drawer-section-body panel" id="drawer-pre-api-freeze"></div>
+      </div>
+      <div class="drawer-section">
+        <div class="drawer-section-label">在线写入就绪</div>
+        <div class="drawer-section-body panel" id="drawer-live-readiness"></div>
+      </div>
+      <div class="drawer-section">
+        <div class="drawer-section-label">模型供应商状态</div>
+        <div class="drawer-sub-grid">
+          <div class="panel" id="drawer-provider-readiness">
+            <div class="card-header"><span class="card-header-dot"></span>就绪状态</div>
+          </div>
+          <div class="panel" id="drawer-provider-smoke">
+            <div class="card-header"><span class="card-header-dot"></span>连通测试</div>
+          </div>
+          <div class="panel" id="drawer-provider-agent-demo">
+            <div class="card-header"><span class="card-header-dot"></span>Agent 演示</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </aside>
 
   <script src="app.js"></script>
 </body>

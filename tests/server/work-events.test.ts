@@ -92,15 +92,17 @@ describe("/api/work-events safe projection", () => {
     }
   });
 
-  it("demo links are marked unavailable", async () => {
+  it("demo links are marked unavailable with self-explanatory labels", async () => {
     const { json } = await fetchRaw("/api/work-events");
-    const events = json as Array<{ link: { available: boolean; link_id: string } | null }>;
+    const events = json as Array<{ link: { available: boolean; link_id: string; link_label: string; unavailable_label: string | null } | null }>;
     let sawDemoLink = false;
     for (const event of events) {
       if (event.link) {
         sawDemoLink = true;
         assert.equal(event.link.available, false, "demo link must have available=false");
         assert.match(event.link.link_id, /^lnk_demo_/, "demo link id must start with lnk_demo_");
+        assert.equal(event.link.link_label, "飞书记录", "demo link_label should be 飞书记录");
+        assert.equal(event.link.unavailable_label, "飞书记录未接入", "demo link must have unavailable_label");
       }
     }
     assert.ok(sawDemoLink, "should have at least one demo link");
@@ -156,6 +158,26 @@ describe("/api/org/overview safety summary", () => {
     assert.equal(data.safety.demo_mode, true);
   });
 
+  it("demo fallback data_source is demo_fixture", async () => {
+    const { json } = await fetchRaw("/api/org/overview");
+    const data = json as { data_source: { mode: string; snapshot_source: unknown; label: string; generated_at: unknown; external_model_calls: boolean; real_writes: boolean } };
+    assert.equal(data.data_source.mode, "demo_fixture");
+    assert.equal(data.data_source.snapshot_source, null);
+    assert.equal(data.data_source.label, "演示样本");
+    assert.equal(data.data_source.generated_at, null);
+    assert.equal(data.data_source.external_model_calls, false);
+    assert.equal(data.data_source.real_writes, false);
+  });
+
+  it("data_source does not leak snapshot path or sensitive fields", async () => {
+    const { text } = await fetchRaw("/api/org/overview");
+    assert.ok(!text.includes("snapshot_path"), "must not contain snapshot_path");
+    assert.ok(!text.includes("rec_"), "must not contain record IDs");
+    assert.ok(!text.includes("prompt"), "must not contain prompt");
+    assert.ok(!text.includes("resume"), "must not contain resume text");
+    assert.ok(!text.includes("payload"), "must not contain payload");
+  });
+
   it("agents include 5 virtual employees with Chinese role names", async () => {
     const { json } = await fetchRaw("/api/org/overview");
     const data = json as { agents: Array<{ agent_name: string; status: string }> };
@@ -163,6 +185,23 @@ describe("/api/org/overview safety summary", () => {
     const names = data.agents.map((a) => a.agent_name);
     for (const expected of ["HR 协调", "简历解析", "初筛评估", "面试准备", "数据分析"]) {
       assert.ok(names.includes(expected), `expected agent ${expected}`);
+    }
+  });
+
+  it("demo fallback stage_counts sum to 1 and only 待决策 is 1", async () => {
+    const { json } = await fetchRaw("/api/org/overview");
+    const data = json as { pipeline: { stage_counts: Array<{ label: string; count: number }> } };
+    const stages = data.pipeline.stage_counts;
+    assert.ok(Array.isArray(stages) && stages.length >= 5, "must have at least 5 stages");
+    const total = stages.reduce((sum, s) => sum + s.count, 0);
+    assert.equal(total, 1, "single-candidate demo should have total count 1");
+    const pending = stages.find((s) => s.label === "待决策");
+    assert.ok(pending, "must include 待决策 stage");
+    assert.equal(pending!.count, 1, "待决策 should be 1");
+    for (const s of stages) {
+      if (s.label !== "待决策") {
+        assert.equal(s.count, 0, `${s.label} should be 0`);
+      }
     }
   });
 

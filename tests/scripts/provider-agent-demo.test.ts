@@ -77,6 +77,7 @@ describe("provider agent demo script - execute guards", () => {
       "--use-provider",
       "--execute",
       "--confirm=EXECUTE_PROVIDER_AGENT_DEMO",
+      "--input-json={\"candidateRecordId\":\"recCandidate001\",\"candidateId\":\"cand_001\",\"resumeText\":\"PM with SQL\",\"fromStatus\":\"new\"}",
     ]);
 
     assert.equal(result.status, 0);
@@ -85,6 +86,22 @@ describe("provider agent demo script - execute guards", () => {
     assert.equal(parsed.status, "blocked");
     assert.ok(Array.isArray(parsed.blockedReasons));
     assert.ok((parsed.blockedReasons as unknown[]).length >= 3);
+  });
+
+  it("execute without input is blocked", () => {
+    const result = runScript([
+      "--use-provider",
+      "--execute",
+      "--confirm=EXECUTE_PROVIDER_AGENT_DEMO",
+    ]);
+
+    assert.equal(result.status, 0);
+    const parsed = parseStdout(result.stdout);
+    assert.equal(parsed.status, "blocked");
+    assert.ok(
+      Array.isArray(parsed.blockedReasons) &&
+      (parsed.blockedReasons as string[]).some((reason) => reason.includes("input")),
+    );
   });
 
   it("execute without --use-provider is blocked", () => {
@@ -103,6 +120,7 @@ describe("provider agent demo script - execute guards", () => {
       "--use-provider",
       "--execute",
       "--confirm=EXECUTE_PROVIDER_AGENT_DEMO",
+      "--input-json={\"candidateRecordId\":\"recCandidate001\",\"candidateId\":\"cand_001\",\"resumeText\":\"PM with SQL\",\"fromStatus\":\"new\"}",
     ]);
 
     assert.equal(result.status, 0);

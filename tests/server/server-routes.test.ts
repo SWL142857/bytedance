@@ -1,5 +1,8 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { createServer } from "../../src/server/server.js";
 import type { Server } from "node:http";
 
@@ -73,6 +76,30 @@ describe("server API routes", () => {
     assert.equal(data.canCallExternalModel, false);
   });
 
+  it("provider report routes do not leak untrusted MODEL_PROVIDER strings", async () => {
+    const previous = process.env.MODEL_PROVIDER;
+    process.env.MODEL_PROVIDER = "custom-provider-sensitive-probe";
+    try {
+      const paths = [
+        "/api/reports/provider-readiness",
+        "/api/reports/provider-smoke",
+        "/api/reports/provider-agent-demo",
+      ];
+      for (const path of paths) {
+        const res = await fetch(`${BASE_URL}${path}`);
+        const text = await res.text();
+        assert.ok(!text.includes("custom-provider-sensitive-probe"), `${path} must not leak MODEL_PROVIDER`);
+        assert.ok(text.includes("自定义供应商"), `${path} should use safe provider label`);
+      }
+    } finally {
+      if (previous === undefined) {
+        delete process.env.MODEL_PROVIDER;
+      } else {
+        process.env.MODEL_PROVIDER = previous;
+      }
+    }
+  });
+
   it("GET /api/reports/provider-smoke returns provider smoke result", async () => {
     const data = await fetchJson("/api/reports/provider-smoke");
     assert.equal(data.mode, "dry_run");
@@ -127,10 +154,32 @@ describe("server API routes", () => {
     assert.ok(res.headers.get("content-type")?.includes("text/css"));
   });
 
+  it("GET /style.css with query string still serves CSS", async () => {
+    const res = await fetch(`${BASE_URL}/style.css?v=cache-check`);
+    assert.ok(res.ok);
+    assert.ok(res.headers.get("content-type")?.includes("text/css"));
+  });
+
   it("GET /app.js serves JS", async () => {
     const res = await fetch(`${BASE_URL}/app.js`);
     assert.ok(res.ok);
     assert.ok(res.headers.get("content-type")?.includes("javascript"));
+  });
+
+  it("HEAD / serves headers without a body", async () => {
+    const res = await fetch(`${BASE_URL}/`, { method: "HEAD" });
+    assert.ok(res.ok);
+    assert.ok(res.headers.get("content-type")?.includes("text/html"));
+    assert.equal(await res.text(), "");
+  });
+
+  it("POST requests do not serve static assets", async () => {
+    const indexRes = await fetch(`${BASE_URL}/`, { method: "POST" });
+    const jsRes = await fetch(`${BASE_URL}/app.js`, { method: "POST" });
+    assert.equal(indexRes.status, 404);
+    assert.equal(jsRes.status, 404);
+    assert.ok(indexRes.headers.get("content-type")?.includes("application/json"));
+    assert.ok(jsRes.headers.get("content-type")?.includes("application/json"));
   });
 
   it("pipeline response does not leak rec_ record IDs", async () => {
@@ -218,10 +267,12 @@ describe("server API routes", () => {
     }
   });
 
-  it("app.js exposes 查看飞书记录 entry without real Feishu URLs", async () => {
+  it("app.js renders link.available-gated event links without real Feishu URLs", async () => {
     const res = await fetch(`${BASE_URL}/app.js`);
     const text = await res.text();
-    assert.ok(text.includes("查看飞书记录"), "app.js must reference 查看飞书记录");
+    assert.ok(text.includes("available"), "app.js must check link.available");
+    assert.ok(text.includes("event-link-unavailable"), "app.js must include unavailable link class");
+    assert.ok(text.includes("飞书记录未接入"), "app.js must include unavailable link text");
     assert.ok(!text.includes("feishu.cn"), "app.js must not reference real feishu.cn URLs");
     assert.ok(!text.includes("larksuite.com"), "app.js must not reference real larksuite URLs");
     assert.ok(!text.includes("base_app_token"), "app.js must not contain base_app_token");
@@ -233,6 +284,45 @@ describe("server API routes", () => {
     assert.ok(!text.includes("EXECUTE_LIVE"), "app.js must not contain live execute confirmation tokens");
     assert.ok(!text.includes("HIRELOOP_ALLOW_LARK_WRITE"), "app.js must not embed write permission env names");
     assert.ok(!text.includes("--execute"), "app.js must not embed execute CLI args");
+  });
+
+  it("app.js and index.html include source hints for static-only sections", async () => {
+    const appRes = await fetch(`${BASE_URL}/app.js`);
+    const appText = await appRes.text();
+    const indexRes = await fetch(`${BASE_URL}/`);
+    const indexText = await indexRes.text();
+    assert.ok(appText.includes("静态只读清单"), "app.js must include operator tasks source hint");
+    assert.ok(appText.includes("不来自运行快照"), "app.js must include snapshot exclusion hint");
+    assert.ok(indexText.includes("本地安全报告，不来自运行快照"), "index.html must include console source hint");
+  });
+
+  it("app.js has data_source display logic and does not hardcode 演示模式", async () => {
+    const res = await fetch(`${BASE_URL}/app.js`);
+    const text = await res.text();
+    assert.ok(text.includes("updateModePill"), "app.js must include updateModePill function");
+    assert.ok(text.includes("updateFooterMeta"), "app.js must include updateFooterMeta function");
+    assert.ok(text.includes("data_source"), "app.js must reference data_source field");
+    assert.ok(text.includes("runtime_snapshot"), "app.js must reference runtime_snapshot mode");
+    assert.ok(text.includes("运行快照已脱敏"), "app.js must include runtime snapshot redaction label");
+    assert.ok(text.includes("演示样本已脱敏"), "app.js must include demo fixture redaction label");
+  });
+
+  it("app.js safety sub text is data-source aware, not hardcoded", async () => {
+    const res = await fetch(`${BASE_URL}/app.js`);
+    const text = await res.text();
+    assert.ok(!text.includes("当前为只读演示模式"), "must not contain hardcoded demo safety sub text");
+    assert.ok(text.includes("buildSafetySubText"), "must include buildSafetySubText helper");
+    assert.ok(text.includes("当前展示本地运行快照"), "must include deterministic snapshot safety text");
+    assert.ok(text.includes("当前展示模型运行快照"), "must include provider snapshot safety text");
+    assert.ok(text.includes("当前展示演示样本"), "must include demo fixture safety text");
+  });
+
+  it("app.js shows generated_at in footer for runtime snapshot", async () => {
+    const res = await fetch(`${BASE_URL}/app.js`);
+    const text = await res.text();
+    assert.ok(text.includes("generated_at"), "app.js must reference generated_at field");
+    assert.ok(text.includes("formatDateTime"), "app.js must use formatDateTime for generated_at display");
+    assert.ok(text.includes("生成 "), "app.js must include 生成 prefix for generated_at");
   });
 
   it("index.html does not reference external fonts", async () => {
@@ -275,14 +365,184 @@ describe("server API routes", () => {
     assert.ok(cssText.includes(".check-icon.block"), "block check status should use failure styling");
   });
 
+  it("runtime snapshot is preferred when configured", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "hireloop-runtime-"));
+    const snapshotPath = join(tempDir, "snapshot.json");
+    writeFileSync(snapshotPath, JSON.stringify({
+      kind: "runtime_dashboard_snapshot",
+      version: 1,
+      generated_at: "2026-04-27T12:00:00.000Z",
+      source: "deterministic",
+      pipeline: {
+        finalStatus: "parsed",
+        completed: false,
+        commandCount: 3,
+        commands: [],
+        agentRuns: [],
+        failedAgent: "screening",
+      },
+      work_events: [],
+      org_overview: {
+        agents: [],
+        pipeline: {
+          final_status: "parsed",
+          completed: false,
+          command_count: 3,
+          stage_counts: [{ label: "已解析", count: 1 }],
+        },
+        recent_events: [],
+        safety: {
+          read_only: true,
+          real_writes: false,
+          external_model_calls: false,
+          demo_mode: false,
+        },
+        data_source: {
+          mode: "runtime_snapshot",
+          snapshot_source: "deterministic",
+          label: "本地运行快照",
+          generated_at: "2026-04-27T12:00:00.000Z",
+          external_model_calls: false,
+          real_writes: false,
+        },
+      },
+    }));
+
+    const snapshotServer = createServer({ runtimeSnapshotPath: snapshotPath });
+    await new Promise<void>((resolve) => {
+      snapshotServer.listen(0, () => resolve());
+    });
+
+    try {
+      const address = snapshotServer.address();
+      assert.ok(address && typeof address === "object");
+
+      const pipelineRes = await fetch(`http://localhost:${address.port}/api/demo/pipeline`);
+      const overviewRes = await fetch(`http://localhost:${address.port}/api/org/overview`);
+      const pipeline = await pipelineRes.json() as { finalStatus: string; failedAgent: string };
+      const overview = await overviewRes.json() as {
+        safety: { demo_mode: boolean };
+        data_source: { mode: string; snapshot_source: string | null; label: string };
+      };
+
+      assert.equal(pipeline.finalStatus, "parsed");
+      assert.equal(pipeline.failedAgent, "screening");
+      assert.equal(overview.safety.demo_mode, false);
+      assert.equal(overview.data_source.mode, "runtime_snapshot");
+      assert.equal(overview.data_source.snapshot_source, "deterministic");
+      assert.equal(overview.data_source.label, "本地运行快照");
+    } finally {
+      await new Promise<void>((resolve) => {
+        snapshotServer.close(() => resolve());
+      });
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("legacy snapshot without data_source is normalized by loader", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "hireloop-legacy-"));
+    const snapshotPath = join(tempDir, "legacy.json");
+    writeFileSync(snapshotPath, JSON.stringify({
+      kind: "runtime_dashboard_snapshot",
+      version: 1,
+      generated_at: "2026-04-27T14:00:00.000Z",
+      source: "deterministic",
+      pipeline: { finalStatus: "parsed", completed: false, commandCount: 1, commands: [], agentRuns: [], failedAgent: null },
+      work_events: [],
+      org_overview: {
+        agents: [],
+        pipeline: { final_status: "parsed", completed: false, command_count: 1, stage_counts: [] },
+        recent_events: [],
+        safety: { read_only: true, real_writes: false, external_model_calls: false, demo_mode: false },
+      },
+    }));
+
+    const legacyServer = createServer({ runtimeSnapshotPath: snapshotPath });
+    await new Promise<void>((resolve) => { legacyServer.listen(0, () => resolve()); });
+    try {
+      const address = legacyServer.address();
+      assert.ok(address && typeof address === "object");
+      const res = await fetch(`http://localhost:${address.port}/api/org/overview`);
+      assert.ok(res.ok);
+      const overview = await res.json() as {
+        data_source: { mode: string; snapshot_source: string | null; label: string; generated_at: string | null };
+      };
+      assert.equal(overview.data_source.mode, "runtime_snapshot");
+      assert.equal(overview.data_source.snapshot_source, "deterministic");
+      assert.equal(overview.data_source.label, "本地运行快照");
+      assert.equal(overview.data_source.generated_at, "2026-04-27T14:00:00.000Z");
+    } finally {
+      await new Promise<void>((resolve) => { legacyServer.close(() => resolve()); });
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it("unsafe snapshot with forbidden key falls back to demo fixture", async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), "hireloop-unsafe-"));
+    const snapshotPath = join(tempDir, "unsafe.json");
+    writeFileSync(snapshotPath, JSON.stringify({
+      kind: "runtime_dashboard_snapshot",
+      version: 1,
+      generated_at: "2026-04-27T12:00:00.000Z",
+      source: "deterministic",
+      pipeline: { finalStatus: "parsed", completed: false, commandCount: 1, commands: [], agentRuns: [], failedAgent: null },
+      work_events: [],
+      org_overview: {
+        agents: [],
+        pipeline: { final_status: "parsed", completed: false, command_count: 1, stage_counts: [] },
+        recent_events: [],
+        safety: { read_only: true, real_writes: false, external_model_calls: false, demo_mode: false },
+        record_id: "rec_leaked_001",
+      },
+    }));
+
+    const unsafeServer = createServer({ runtimeSnapshotPath: snapshotPath });
+    await new Promise<void>((resolve) => { unsafeServer.listen(0, () => resolve()); });
+    try {
+      const address = unsafeServer.address();
+      assert.ok(address && typeof address === "object");
+      const res = await fetch(`http://localhost:${address.port}/api/org/overview`);
+      assert.ok(res.ok);
+      const overview = await res.json() as {
+        data_source: { mode: string };
+      };
+      assert.equal(overview.data_source.mode, "demo_fixture", "should fall back to demo when snapshot is unsafe");
+      const text = JSON.stringify(overview);
+      assert.ok(!text.includes("rec_leaked"), "response must not contain leaked record ID");
+      assert.ok(!text.includes("record_id"), "response must not contain forbidden key name");
+    } finally {
+      await new Promise<void>((resolve) => { unsafeServer.close(() => resolve()); });
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+
   it("500 error returns fixed safe message without stack traces", async () => {
-    const res = await fetch(`${BASE_URL}/api/demo/pipeline`, { method: "POST" });
-    if (res.status >= 400) {
+    const failingServer = createServer({
+      beforeApiRoute(pathname) {
+        if (pathname === "/api/demo/pipeline") {
+          throw new Error("internal path /tmp/secret.ts:12 at stack frame");
+        }
+      },
+    });
+    await new Promise<void>((resolve) => {
+      failingServer.listen(0, () => resolve());
+    });
+    try {
+      const address = failingServer.address();
+      assert.ok(address && typeof address === "object");
+      const res = await fetch(`http://localhost:${address.port}/api/demo/pipeline`);
+      assert.equal(res.status, 500);
       const text = await res.text();
+      assert.equal(text, JSON.stringify({ error: "服务内部错误" }));
       assert.ok(!text.includes("Error:"), "error response must not contain Error:");
       assert.ok(!text.includes(".ts:"), "error response must not contain .ts: stack traces");
       assert.ok(!text.includes(".js:"), "error response must not contain .js: stack traces");
       assert.ok(!text.includes(" at "), "error response must not contain stack trace lines");
+      assert.ok(!text.includes("/tmp/secret"), "error response must not contain internal paths");
+    } finally {
+      await new Promise<void>((resolve) => {
+        failingServer.close(() => resolve());
+      });
     }
   });
 });

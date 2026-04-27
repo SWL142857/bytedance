@@ -1,6 +1,6 @@
 import http from "node:http";
 import { readFileSync, existsSync } from "node:fs";
-import { join, extname } from "node:path";
+import { extname, resolve, sep } from "node:path";
 import { DeterministicLlmClient } from "../llm/deterministic-client.js";
 import { runCandidatePipeline } from "../orchestrator/candidate-pipeline.js";
 import { buildMvpReleaseGateReport } from "../orchestrator/mvp-release-gate.js";
@@ -13,6 +13,10 @@ import { buildLiveReadinessReport } from "../orchestrator/live-readiness-report.
 import { loadConfig } from "../config.js";
 import { buildDemoWorkEvents } from "./work-events-demo.js";
 import { buildOperatorTasksOverview } from "./operator-tasks-demo.js";
+import {
+  DEFAULT_RUNTIME_SNAPSHOT_PATH,
+  loadRuntimeDashboardSnapshot,
+} from "./runtime-dashboard.js";
 import {
   redactPipelineResult,
   redactReleaseGate,
@@ -35,8 +39,13 @@ const CONTENT_TYPES: Record<string, string> = {
   ".svg": "image/svg+xml",
 };
 
-const UI_DIR = join(import.meta.dirname, "..", "ui");
+const UI_DIR = resolve(import.meta.dirname, "..", "ui");
 const PORT = 3000;
+
+export interface UiServerOptions {
+  beforeApiRoute?: (pathname: string) => void;
+  runtimeSnapshotPath?: string | null;
+}
 
 function jsonResponse(res: http.ServerResponse, data: unknown): void {
   const body = JSON.stringify(data);
@@ -50,10 +59,26 @@ function errorResponse(res: http.ServerResponse, status: number, message: string
 }
 
 function serveStatic(req: http.IncomingMessage, res: http.ServerResponse): boolean {
-  const urlPath = req.url === "/" ? "/index.html" : (req.url ?? "/index.html");
-  const filePath = join(UI_DIR, urlPath);
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    return false;
+  }
 
-  if (!filePath.startsWith(UI_DIR)) {
+  const url = new URL(req.url ?? "/", `http://localhost:${PORT}`);
+  const urlPath = url.pathname === "/" ? "/index.html" : url.pathname;
+  let decodedPath: string;
+  try {
+    decodedPath = decodeURIComponent(urlPath);
+  } catch {
+    return false;
+  }
+
+  if (decodedPath.includes("\0")) {
+    return false;
+  }
+
+  const filePath = resolve(UI_DIR, `.${decodedPath}`);
+
+  if (!isInsideUiDir(filePath)) {
     return false;
   }
 
@@ -64,13 +89,17 @@ function serveStatic(req: http.IncomingMessage, res: http.ServerResponse): boole
   const ext = extname(filePath);
   const contentType = CONTENT_TYPES[ext] ?? "application/octet-stream";
   try {
-    const content = readFileSync(filePath);
+    const content = req.method === "HEAD" ? null : readFileSync(filePath);
     res.writeHead(200, { "Content-Type": contentType });
     res.end(content);
     return true;
   } catch {
     return false;
   }
+}
+
+function isInsideUiDir(filePath: string): boolean {
+  return filePath === UI_DIR || filePath.startsWith(`${UI_DIR}${sep}`);
 }
 
 function buildOrgOverview(): OrgOverviewView {
@@ -97,10 +126,10 @@ function buildOrgOverview(): OrgOverviewView {
       completed: true,
       command_count: 5,
       stage_counts: [
-        { label: "新增", count: 1 },
-        { label: "已解析", count: 1 },
-        { label: "已筛选", count: 1 },
-        { label: "面试就绪", count: 1 },
+        { label: "新增", count: 0 },
+        { label: "已解析", count: 0 },
+        { label: "已筛选", count: 0 },
+        { label: "面试就绪", count: 0 },
         { label: "待决策", count: 1 },
       ],
     },
@@ -111,7 +140,22 @@ function buildOrgOverview(): OrgOverviewView {
       external_model_calls: false,
       demo_mode: true,
     },
+    data_source: {
+      mode: "demo_fixture",
+      snapshot_source: null,
+      label: "演示样本",
+      generated_at: null,
+      external_model_calls: false,
+      real_writes: false,
+    },
   };
+}
+
+function getRuntimeSnapshot(options: UiServerOptions): ReturnType<typeof loadRuntimeDashboardSnapshot> {
+  if (options.runtimeSnapshotPath === null || typeof options.runtimeSnapshotPath === "undefined") {
+    return null;
+  }
+  return loadRuntimeDashboardSnapshot(options.runtimeSnapshotPath);
 }
 
 function buildAgentOverview(
@@ -144,11 +188,20 @@ function determineAgentStatus(event: OrgOverviewView["recent_events"][number] | 
 async function handleApi(
   req: http.IncomingMessage,
   res: http.ServerResponse,
+  options: UiServerOptions = {},
 ): Promise<void> {
   const url = new URL(req.url ?? "/", `http://localhost:${PORT}`);
 
   try {
+    options.beforeApiRoute?.(url.pathname);
+
     if (url.pathname === "/api/demo/pipeline" && req.method === "GET") {
+      const runtimeSnapshot = getRuntimeSnapshot(options);
+      if (runtimeSnapshot) {
+        jsonResponse(res, runtimeSnapshot.pipeline);
+        return;
+      }
+
       const client = new DeterministicLlmClient();
       const result = await runCandidatePipeline(client, {
         candidateRecordId: "rec_demo_candidate_001",
@@ -168,11 +221,23 @@ async function handleApi(
     }
 
     if (url.pathname === "/api/work-events" && req.method === "GET") {
+      const runtimeSnapshot = getRuntimeSnapshot(options);
+      if (runtimeSnapshot) {
+        jsonResponse(res, runtimeSnapshot.work_events);
+        return;
+      }
+
       jsonResponse(res, redactWorkEvents(buildDemoWorkEvents()));
       return;
     }
 
     if (url.pathname === "/api/org/overview" && req.method === "GET") {
+      const runtimeSnapshot = getRuntimeSnapshot(options);
+      if (runtimeSnapshot) {
+        jsonResponse(res, runtimeSnapshot.org_overview);
+        return;
+      }
+
       jsonResponse(res, buildOrgOverview());
       return;
     }
@@ -301,10 +366,10 @@ function handleGo(req: http.IncomingMessage, res: http.ServerResponse): void {
   });
 }
 
-export function createServer(): http.Server {
+export function createServer(options: UiServerOptions = {}): http.Server {
   return http.createServer(async (req, res) => {
     if (req.url?.startsWith("/api/")) {
-      await handleApi(req, res);
+      await handleApi(req, res, options);
       return;
     }
 
@@ -322,7 +387,7 @@ export function createServer(): http.Server {
 }
 
 export function startServer(port: number = PORT): http.Server {
-  const server = createServer();
+  const server = createServer({ runtimeSnapshotPath: DEFAULT_RUNTIME_SNAPSHOT_PATH });
   server.listen(port, () => {
     console.log(`HireLoop UI: http://localhost:${port}`);
   });

@@ -151,7 +151,7 @@ describe("redactPipelineResult", () => {
 });
 
 describe("redactReleaseGate", () => {
-  it("passes through report unchanged", () => {
+  it("redacts sensitive strings inside release gate report", () => {
     const report: MvpReleaseGateReport = {
       title: "MVP Release Gate",
       status: "ready_for_demo",
@@ -159,16 +159,27 @@ describe("redactReleaseGate", () => {
       liveSafetyReady: true,
       realWritePermittedByReport: false,
       externalModelCallPermittedByReport: false,
-      checks: [],
-      recommendedDemoCommands: [],
-      finalHandoffNote: "",
+      checks: [
+        {
+          name: "Trace rec_secret_001",
+          status: "block",
+          summary: "payload contained rec_secret_001",
+          commandHint: "inspect payload",
+        },
+      ],
+      recommendedDemoCommands: ["echo rec_secret_001"],
+      finalHandoffNote: "authorization header must not leak",
     };
-    assert.deepEqual(redactReleaseGate(report), report);
+    const safe = redactReleaseGate(report);
+    const text = JSON.stringify(safe);
+    assert.ok(!text.includes("rec_secret_001"));
+    assert.ok(!text.includes("payload"));
+    assert.ok(!text.includes("authorization"));
   });
 });
 
 describe("redactApiBoundaryAudit", () => {
-  it("passes through report unchanged", () => {
+  it("redacts sensitive strings inside API boundary report", () => {
     const report: ApiBoundaryAuditReport = {
       title: "API Boundary Release Audit",
       status: "ready",
@@ -182,96 +193,118 @@ describe("redactApiBoundaryAudit", () => {
       forbiddenTraceScanPassed: true,
       secretScanPassed: true,
       releaseGateConsistent: true,
-      checks: [],
-      recommendedCommands: [],
-      finalNote: "",
+      checks: [{ name: "Output", status: "block", summary: "raw stdout included rec_secret_001" }],
+      recommendedCommands: ["cat raw_stdout"],
+      finalNote: "bearer value was detected",
     };
-    assert.deepEqual(redactApiBoundaryAudit(report), report);
+    const safe = redactApiBoundaryAudit(report);
+    const text = JSON.stringify(safe);
+    assert.ok(!text.includes("rec_secret_001"));
+    assert.ok(!text.includes("raw"));
+    assert.ok(!text.includes("bearer"));
   });
 });
 
 describe("redactProviderReadiness", () => {
-  it("passes through readiness unchanged", () => {
+  it("sanitizes provider name and provider summary", () => {
     const readiness: ProviderAdapterReadiness = {
       status: "disabled",
-      providerName: "volcengine-ark",
+      providerName: "custom-provider-sensitive-probe",
       canCallExternalModel: false,
-      blockedReasons: [],
-      safeSummary: "Provider adapter is disabled.",
+      blockedReasons: ["Provider custom-provider-sensitive-probe is disabled."],
+      safeSummary: "Provider custom-provider-sensitive-probe is disabled.",
     };
-    assert.deepEqual(redactProviderReadiness(readiness), readiness);
+    const safe = redactProviderReadiness(readiness);
+    const text = JSON.stringify(safe);
+    assert.equal(safe.providerName, "自定义供应商");
+    assert.ok(!text.includes("custom-provider-sensitive-probe"));
   });
 });
 
 describe("redactProviderSmoke", () => {
-  it("passes through result unchanged", () => {
+  it("sanitizes provider smoke result strings", () => {
     const result: ProviderSmokeResult = {
       mode: "dry_run",
       status: "planned",
-      providerName: "volcengine-ark",
+      providerName: "custom-provider-sensitive-probe",
       canCallExternalModel: false,
       httpStatus: null,
       hasChoices: null,
       contentLength: null,
       durationMs: 0,
-      blockedReasons: [],
+      blockedReasons: ["Missing required config: API key."],
       errorKind: null,
-      safeSummary: "Dry run plan.",
+      safeSummary: "Dry run plan for custom-provider-sensitive-probe.",
     };
-    assert.deepEqual(redactProviderSmoke(result), result);
+    const safe = redactProviderSmoke(result);
+    const text = JSON.stringify(safe);
+    assert.equal(safe.providerName, "自定义供应商");
+    assert.ok(!text.includes("custom-provider-sensitive-probe"));
+    assert.ok(!text.includes("API key"));
   });
 });
 
 describe("redactProviderAgentDemo", () => {
-  it("passes through result unchanged", () => {
+  it("sanitizes provider agent demo result strings", () => {
     const result: ProviderAgentDemoResult = {
       mode: "dry_run",
       status: "planned",
-      providerName: "volcengine-ark",
+      providerName: "custom-provider-sensitive-probe",
       canCallExternalModel: false,
       commandCount: null,
-      agentRunStatus: null,
+      agentRunStatus: "raw_stdout",
       retryCount: null,
       durationMs: 0,
-      blockedReasons: [],
-      safeSummary: "Dry run plan.",
+      blockedReasons: ["Provider custom-provider-sensitive-probe blocked."],
+      safeSummary: "Dry run plan for custom-provider-sensitive-probe.",
     };
-    assert.deepEqual(redactProviderAgentDemo(result), result);
+    const safe = redactProviderAgentDemo(result);
+    const text = JSON.stringify(safe);
+    assert.equal(safe.providerName, "自定义供应商");
+    assert.equal(safe.agentRunStatus, "[已脱敏]");
+    assert.ok(!text.includes("custom-provider-sensitive-probe"));
   });
 });
 
 describe("redactPreApiFreeze", () => {
-  it("passes through report unchanged", () => {
+  it("redacts sensitive strings inside pre-API freeze report", () => {
     const report: PreApiFreezeReport = {
       title: "Pre-API Freeze Report",
       status: "frozen",
       apiIntegrationAllowed: true,
       externalModelCallAllowedByReport: false,
       realBaseWriteAllowedByReport: false,
-      checks: [],
-      allowedNextChanges: [],
-      blockedChanges: [],
-      finalNote: "",
+      checks: [{ name: "Redaction", status: "blocked", summary: "prompt leaked rec_secret_001" }],
+      allowedNextChanges: ["add endpoint validation"],
+      blockedChanges: ["writing raw prompts"],
+      finalNote: "prompt must stay hidden",
     };
-    assert.deepEqual(redactPreApiFreeze(report), report);
+    const safe = redactPreApiFreeze(report);
+    const text = JSON.stringify(safe);
+    assert.ok(!text.includes("rec_secret_001"));
+    assert.ok(!text.includes("prompt"));
+    assert.ok(!text.includes("endpoint"));
   });
 });
 
 describe("redactLiveReadiness", () => {
-  it("passes through report unchanged", () => {
+  it("redacts sensitive strings inside live readiness report", () => {
     const report: LiveReadinessReport = {
       mode: "readonly",
       ready: false,
       checkedAt: "2026-01-01T00:00:00Z",
-      checks: [],
+      checks: [{ name: "Records", status: "fail", summary: "Resolved rec_secret_001" }],
       resolutionMode: "sample",
       resolvedRecordCount: 0,
       requiredRecordCount: 2,
       plannedWriteCount: 0,
       safeToExecuteLiveWrites: false,
-      nextStep: "Configure environment.",
+      nextStep: "Configure endpoint before rec_secret_001 use.",
     };
-    assert.deepEqual(redactLiveReadiness(report), report);
+    const safe = redactLiveReadiness(report);
+    const text = JSON.stringify(safe);
+    assert.ok(!text.includes("rec_secret_001"));
+    assert.ok(!text.includes("endpoint"));
   });
 });
 
@@ -358,7 +391,8 @@ describe("buildSafeLinkForWorkEvent", () => {
     assert.ok(link, "demo_only event should have a link");
     assert.equal(link!.available, false);
     assert.match(link!.link_id, /^lnk_demo_\d{3}$/);
-    assert.equal(link!.link_label, "查看飞书记录");
+    assert.equal(link!.link_label, "飞书记录");
+    assert.equal(link!.unavailable_label, "飞书记录未接入");
   });
 
   it("infers candidate link type from target_table", () => {

@@ -63,7 +63,14 @@ describe("Integration boundary — deterministic client is default", () => {
     const scriptsDir = path.resolve("scripts");
     const files = fs.readdirSync(scriptsDir).filter((f) => f.endsWith(".ts"));
 
+    // Scripts that legitimately use provider client when properly gated
+    const allowProviderImport = new Set([
+      "run-live-agent-dataset.ts",
+    ]);
+
     for (const file of files) {
+      if (allowProviderImport.has(file)) continue;
+
       const content = fs.readFileSync(path.join(scriptsDir, file), "utf-8");
       if (content.includes("LlmClient") || content.includes("llm")) {
         assert.ok(

@@ -12,6 +12,7 @@
     "base:seed:dry-run": "node --import tsx scripts/seed-base.ts",
     "base:seed:execute": "node --import tsx scripts/seed-base.ts --execute",
     "pipeline:demo": "node --import tsx scripts/demo-pipeline.ts",
+    "pipeline:run": "node --import tsx scripts/run-agent-pipeline.ts",
     "report:demo": "node --import tsx scripts/demo-report.ts",
     "decision:demo": "node --import tsx scripts/demo-human-decision.ts",
     "mvp:demo": "node --import tsx scripts/demo-mvp.ts",
@@ -35,6 +36,7 @@
     "mvp:provider-agent-demo": "node --import tsx scripts/run-provider-agent-demo.ts",
     "mvp:provider-agent-demo:execute": "node --import tsx scripts/run-provider-agent-demo.ts --use-provider --execute --confirm=EXECUTE_PROVIDER_AGENT_DEMO",
     "mvp:api-boundary-audit": "node --import tsx scripts/demo-api-boundary-release-audit.ts",
+    "dataset:run": "node --import tsx scripts/run-live-agent-dataset.ts",
     "ui:dev": "node --import tsx scripts/start-ui-server.ts"
   },
   "keywords": [

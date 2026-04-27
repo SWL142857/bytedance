@@ -58,7 +58,7 @@ const TEXT_REDACTION_PATTERNS = [
   /\bauthorization\b/gi,
   /\bbearer\b/gi,
   /\bpayload\b/gi,
-  /\bprompt\b/gi,
+  /\bprompts?\b/gi,
   /\braw(?:[_ -]?(?:response|stdout|stderr))?\b/gi,
   /\bstdout\b/gi,
   /\bstderr\b/gi,
@@ -99,31 +99,98 @@ export function redactPipelineResult(result: CandidatePipelineResult): SafePipel
 }
 
 export function redactReleaseGate(report: MvpReleaseGateReport): MvpReleaseGateReport {
-  return report;
+  return {
+    ...report,
+    title: redactSafeText(report.title),
+    checks: report.checks.map((check) => ({
+      ...check,
+      name: redactSafeText(check.name),
+      summary: redactSafeText(check.summary),
+      commandHint: redactSafeText(check.commandHint),
+    })),
+    recommendedDemoCommands: report.recommendedDemoCommands.map(redactSafeText),
+    finalHandoffNote: redactSafeText(report.finalHandoffNote),
+  };
 }
 
 export function redactApiBoundaryAudit(report: ApiBoundaryAuditReport): ApiBoundaryAuditReport {
-  return report;
+  return {
+    ...report,
+    title: redactSafeText(report.title),
+    checks: report.checks.map((check) => ({
+      ...check,
+      name: redactSafeText(check.name),
+      summary: redactSafeText(check.summary),
+    })),
+    recommendedCommands: report.recommendedCommands.map(redactSafeText),
+    finalNote: redactSafeText(report.finalNote),
+  };
 }
 
 export function redactProviderReadiness(readiness: ProviderAdapterReadiness): ProviderAdapterReadiness {
-  return readiness;
+  const providerName = sanitizeProviderName(readiness.providerName);
+  return {
+    ...readiness,
+    providerName,
+    blockedReasons: readiness.blockedReasons.map((reason) =>
+      redactProviderText(reason, readiness.providerName, providerName),
+    ),
+    safeSummary: redactProviderText(readiness.safeSummary, readiness.providerName, providerName),
+  };
 }
 
 export function redactProviderAgentDemo(result: ProviderAgentDemoResult): ProviderAgentDemoResult {
-  return result;
+  const providerName = sanitizeProviderName(result.providerName);
+  return {
+    ...result,
+    providerName,
+    agentRunStatus: sanitizeOptionalText(result.agentRunStatus),
+    blockedReasons: result.blockedReasons.map((reason) =>
+      redactProviderText(reason, result.providerName, providerName),
+    ),
+    safeSummary: redactProviderText(result.safeSummary, result.providerName, providerName),
+  };
 }
 
 export function redactProviderSmoke(result: ProviderSmokeResult): ProviderSmokeResult {
-  return result;
+  const providerName = sanitizeProviderName(result.providerName);
+  return {
+    ...result,
+    providerName,
+    blockedReasons: result.blockedReasons.map((reason) =>
+      redactProviderText(reason, result.providerName, providerName),
+    ),
+    errorKind: sanitizeOptionalText(result.errorKind),
+    safeSummary: redactProviderText(result.safeSummary, result.providerName, providerName),
+  };
 }
 
 export function redactPreApiFreeze(report: PreApiFreezeReport): PreApiFreezeReport {
-  return report;
+  return {
+    ...report,
+    title: redactSafeText(report.title),
+    checks: report.checks.map((check) => ({
+      ...check,
+      name: redactSafeText(check.name),
+      summary: redactSafeText(check.summary),
+    })),
+    allowedNextChanges: report.allowedNextChanges.map(redactSafeText),
+    blockedChanges: report.blockedChanges.map(redactSafeText),
+    finalNote: redactSafeText(report.finalNote),
+  };
 }
 
 export function redactLiveReadiness(report: LiveReadinessReport): LiveReadinessReport {
-  return report;
+  return {
+    ...report,
+    checkedAt: redactSafeText(report.checkedAt),
+    checks: report.checks.map((check) => ({
+      ...check,
+      name: redactSafeText(check.name),
+      summary: redactSafeText(check.summary),
+    })),
+    nextStep: redactSafeText(report.nextStep),
+  };
 }
 
 export function redactWorkEvent(event: WorkEvent): SafeWorkEventView {
@@ -155,9 +222,10 @@ export function buildSafeLinkForWorkEvent(event: WorkEvent): SafeLinkView | null
   if (event.link_status === "demo_only") {
     return {
       link_id: buildDemoLinkId(event),
-      link_label: "查看飞书记录",
+      link_label: "飞书记录",
       link_type: inferLinkType(event),
       available: false,
+      unavailable_label: "飞书记录未接入",
     };
   }
 
@@ -202,6 +270,26 @@ function sanitizeOptionalText(value: string | null): string | null {
     return null;
   }
   return redactSafeText(value);
+}
+
+function sanitizeProviderName(value: string): string {
+  const normalized = typeof value === "string" ? value.trim() : "";
+  if (normalized === "volcengine-ark") {
+    return normalized;
+  }
+  if (!normalized) {
+    return "未配置";
+  }
+  return "自定义供应商";
+}
+
+function redactProviderText(text: string, rawProviderName: string, safeProviderName: string): string {
+  const value = typeof text === "string" ? text : "";
+  const normalized =
+    rawProviderName && rawProviderName !== safeProviderName
+      ? value.split(rawProviderName).join(safeProviderName)
+      : value;
+  return redactSafeText(normalized);
 }
 
 function sanitizeDuration(value: number): number {

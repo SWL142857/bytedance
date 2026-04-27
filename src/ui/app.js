@@ -433,7 +433,7 @@
       tone: "brand", icon: ICON_USERS,
       label: "流水线候选人",
       value: totalCandidates, suffix: "人",
-      foot: "覆盖 " + stageCounts.length + " 个阶段",
+      foot: "当前阶段分布 · 追踪 " + stageCounts.length + " 个流程状态",
     });
     html += kpiCardHtml({
       tone: "warning", icon: ICON_FLAG,
@@ -473,6 +473,18 @@
     if (status === "需要人工处理") return "agent-status-human";
     if (status === "阻塞") return "agent-status-blocked";
     return "agent-status-idle";
+  }
+
+  function buildSafetySubText(data) {
+    var ds = data.data_source;
+    var safety = data.safety;
+    if (ds && ds.mode === "runtime_snapshot" && ds.snapshot_source === "provider") {
+      return "当前展示模型运行快照；外部模型调用状态以安全标记为准，界面仍只读，真实写入仍需人工授权。";
+    }
+    if (ds && ds.mode === "runtime_snapshot") {
+      return "当前展示本地运行快照；界面只读，真实写入仍需人工授权。";
+    }
+    return "当前展示演示样本；界面只读，所有真实写入需要人工授权。";
   }
 
   function renderOrgOverview(data, eventsData) {
@@ -529,7 +541,7 @@
     if (data.safety) {
       html += '<div class="org-safety">';
       html += '<div class="org-safety-title">组织安全状态</div>';
-      html += '<div class="org-safety-sub">当前为只读演示模式，所有真实写入需要人工授权</div>';
+      html += '<div class="org-safety-sub">' + esc(buildSafetySubText(data)) + '</div>';
       html += '<div class="safety-rows">';
       html += safetyRow("只读模式", data.safety.read_only);
       html += safetyRow("真实写入", data.safety.real_writes);
@@ -610,9 +622,13 @@
 
       html += '<div class="event-aside">';
       html += '<span class="event-time">' + esc(relativeTime(e.created_at)) + '</span>';
-      if (e.link && e.link.link_id) {
-        html += '<button type="button" class="event-link-btn" data-link-id="' +
-          esc(e.link.link_id) + '">查看飞书记录</button>';
+      if (e.link) {
+        if (e.link.available) {
+          html += '<button type="button" class="event-link-btn" data-link-id="' +
+            esc(e.link.link_id) + '">' + esc(e.link.link_label || "打开记录") + '</button>';
+        } else {
+          html += '<span class="event-link-unavailable">' + esc(e.link.unavailable_label || "飞书记录未接入") + '</span>';
+        }
       }
       html += '</div>';
 
@@ -693,6 +709,8 @@
     html += '<svg class="operator-notice-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><circle cx="12" cy="16" r="0.5" fill="currentColor"/></svg>';
     html += '<span>' + esc(data.notice || "操作员控制台尚处于准备阶段，仅展示只读任务清单。") + '</span>';
     html += '</div>';
+
+    html += '<div class="section-source-hint">静态只读清单，不来自运行快照</div>';
 
     html += '<div class="tasks-grid">';
     for (var i = 0; i < data.tasks.length; i++) {
@@ -776,13 +794,16 @@
     container.innerHTML = html;
   }
 
-  // ── Report renderers ──────────────────────────────────────
+  // ── Report renderers (render into drawer targets) ─────────
 
   function renderReleaseGate(data) {
-    var el = document.getElementById("release-gate-content");
-    if (!el) return;
+    consoleHealthState.releaseGate.error = false;
+    consoleHealthState.releaseGate.ok = isStatusOk(data.status);
+    var drawerEl = document.getElementById("drawer-release-gate");
+    if (!drawerEl) return;
 
-    var html = '<div class="card-body">';
+    var html = '<div class="card-header"><span class="card-header-dot"></span>交付检查</div>';
+    html += '<div class="card-body">';
     html += badgeHtml(data.status);
     html += '<div class="indicator-rows">';
     html += indicatorHtml("本地演示就绪", data.localDemoReady);
@@ -794,14 +815,17 @@
     html += codeListHtml(data.recommendedDemoCommands);
     html += noteHtml(data.finalHandoffNote);
     html += '</div>';
-    el.innerHTML = html;
+    drawerEl.innerHTML = html;
   }
 
   function renderApiAudit(data) {
-    var el = document.getElementById("api-audit-content");
-    if (!el) return;
+    consoleHealthState.apiAudit.error = false;
+    consoleHealthState.apiAudit.ok = isStatusOk(data.status);
+    var drawerEl = document.getElementById("drawer-api-audit");
+    if (!drawerEl) return;
 
-    var html = '<div class="card-body">';
+    var html = '<div class="card-header"><span class="card-header-dot"></span>API 边界审计</div>';
+    html += '<div class="card-body">';
     html += badgeHtml(data.status);
     html += '<div class="indicator-rows">';
     html += indicatorHtml("外部模型调用", data.defaultExternalModelCallsPermittedByReport);
@@ -818,14 +842,17 @@
     html += codeListHtml(data.recommendedCommands);
     html += noteHtml(data.finalNote);
     html += '</div>';
-    el.innerHTML = html;
+    drawerEl.innerHTML = html;
   }
 
   function renderPreApiFreeze(data) {
-    var el = document.getElementById("pre-api-freeze-content");
-    if (!el) return;
+    consoleHealthState.preApiFreeze.error = false;
+    consoleHealthState.preApiFreeze.ok = isStatusOk(data.status);
+    var drawerEl = document.getElementById("drawer-pre-api-freeze");
+    if (!drawerEl) return;
 
-    var html = '<div class="card-body">';
+    var html = '<div class="card-header"><span class="card-header-dot"></span>架构冻结</div>';
+    html += '<div class="card-body">';
     html += badgeHtml(data.status);
     html += '<div class="indicator-rows">';
     html += indicatorHtml("允许 API 接入", data.apiIntegrationAllowed);
@@ -836,14 +863,17 @@
     html += changesHtml(data.allowedNextChanges, data.blockedChanges);
     html += noteHtml(data.finalNote);
     html += '</div>';
-    el.innerHTML = html;
+    drawerEl.innerHTML = html;
   }
 
   function renderLiveReadiness(data) {
-    var el = document.getElementById("live-readiness-content");
-    if (!el) return;
+    consoleHealthState.liveReadiness.error = false;
+    consoleHealthState.liveReadiness.ok = data.ready === true;
+    var drawerEl = document.getElementById("drawer-live-readiness");
+    if (!drawerEl) return;
 
-    var html = '<div class="card-body">';
+    var html = '<div class="card-header"><span class="card-header-dot"></span>在线写入就绪</div>';
+    html += '<div class="card-body">';
     html += '<div class="readiness-hero">';
     html += '<div class="readiness-status ' + (data.ready ? 'ready' : 'not-ready') + '">' +
       (data.ready ? '就绪' : '未就绪') + '</div>';
@@ -863,16 +893,19 @@
       html += '<div class="readiness-next">' + esc(displayText(data.nextStep)) + '</div>';
     }
     html += '</div>';
-    el.innerHTML = html;
+    drawerEl.innerHTML = html;
   }
 
-  // ── Provider renderers ────────────────────────────────────
+  // ── Provider renderers (render into drawer targets) ────────
 
   function renderProviderReadiness(data) {
-    var el = document.getElementById("provider-readiness-content");
-    if (!el) return;
+    consoleHealthState.providerReadiness.error = false;
+    consoleHealthState.providerReadiness.ok = isStatusOk(data.status);
+    var drawerEl = document.getElementById("drawer-provider-readiness");
+    if (!drawerEl) return;
 
-    var html = '<div class="card-body">';
+    var html = '<div class="card-header"><span class="card-header-dot"></span>就绪状态</div>';
+    html += '<div class="card-body">';
     html += badgeHtml(data.status);
     html += '<div class="indicator-rows">';
     html += indicatorHtml("模型供应商", data.providerName);
@@ -887,14 +920,17 @@
     }
     html += '<div class="provider-summary">' + esc(displayText(data.safeSummary)) + '</div>';
     html += '</div>';
-    el.innerHTML = html;
+    drawerEl.innerHTML = html;
   }
 
   function renderProviderSmoke(data) {
-    var el = document.getElementById("provider-smoke-content");
-    if (!el) return;
+    consoleHealthState.providerSmoke.error = false;
+    consoleHealthState.providerSmoke.ok = isStatusOk(data.status);
+    var drawerEl = document.getElementById("drawer-provider-smoke");
+    if (!drawerEl) return;
 
-    var html = '<div class="card-body">';
+    var html = '<div class="card-header"><span class="card-header-dot"></span>连通测试</div>';
+    html += '<div class="card-body">';
     html += badgeHtml(data.mode);
     html += badgeHtml(data.status);
     html += '<div class="provider-metric"><span class="provider-metric-label">HTTP 状态</span>' +
@@ -907,14 +943,17 @@
       '<span class="provider-metric-value">' + esc(data.errorKind || '无') + '</span></div>';
     html += '<div class="provider-summary">' + esc(displayText(data.safeSummary)) + '</div>';
     html += '</div>';
-    el.innerHTML = html;
+    drawerEl.innerHTML = html;
   }
 
   function renderProviderAgentDemo(data) {
-    var el = document.getElementById("provider-agent-demo-content");
-    if (!el) return;
+    consoleHealthState.providerAgentDemo.error = false;
+    consoleHealthState.providerAgentDemo.ok = isStatusOk(data.status);
+    var drawerEl = document.getElementById("drawer-provider-agent-demo");
+    if (!drawerEl) return;
 
-    var html = '<div class="card-body">';
+    var html = '<div class="card-header"><span class="card-header-dot"></span>Agent 演示</div>';
+    html += '<div class="card-body">';
     html += badgeHtml(data.mode);
     html += badgeHtml(data.status);
     html += '<div class="provider-metric"><span class="provider-metric-label">命令数</span>' +
@@ -927,7 +966,131 @@
       '<span class="provider-metric-value">' + (data.retryCount != null ? data.retryCount : '—') + '</span></div>';
     html += '<div class="provider-summary">' + esc(displayText(data.safeSummary)) + '</div>';
     html += '</div>';
+    drawerEl.innerHTML = html;
+  }
+
+  // ── System Console Health State ─────────────────────────
+
+  var consoleHealthState = {
+    releaseGate: { ok: true, error: false },
+    apiAudit: { ok: true, error: false },
+    preApiFreeze: { ok: true, error: false },
+    liveReadiness: { ok: true, error: false },
+    providerReadiness: { ok: true, error: false },
+    providerSmoke: { ok: true, error: false },
+    providerAgentDemo: { ok: true, error: false },
+  };
+
+  function isStatusOk(status) {
+    if (status == null) return true;
+    var s = String(status).toLowerCase();
+    return s === "pass" || s === "passed" || s === "ok" || s === "ready" ||
+           s === "locked" || s === "disabled" || s === "readonly" || s === "dry_run";
+  }
+
+  function isStatusIssue(status) {
+    if (status == null) return false;
+    var s = String(status).toLowerCase();
+    return s === "fail" || s === "failed" || s === "block" || s === "blocked" ||
+           s === "warn" || s === "warning" || s === "needs_review" || s === "error";
+  }
+
+  function updateConsoleBadge() {
+    var badge = document.getElementById("console-badge");
+    if (!badge) return;
+
+    var hasError = false;
+    var hasIssue = false;
+    var keys = Object.keys(consoleHealthState);
+    for (var i = 0; i < keys.length; i++) {
+      var state = consoleHealthState[keys[i]];
+      if (state.error) { hasError = true; break; }
+      if (!state.ok) hasIssue = true;
+    }
+
+    if (hasError) {
+      badge.textContent = "加载异常";
+      badge.className = "console-entry-badge badge-warn";
+    } else if (hasIssue) {
+      badge.textContent = "存在预警";
+      badge.className = "console-entry-badge badge-warn";
+    } else {
+      badge.textContent = "全部正常";
+      badge.className = "console-entry-badge badge-ok";
+    }
+  }
+
+  function renderDrawerError(drawerId, title) {
+    var el = document.getElementById(drawerId);
+    if (!el) return;
+    var html = '<div class="card-header"><span class="card-header-dot"></span>' + esc(title) + '</div>';
+    html += '<div class="card-body">' + errorHtml() + '</div>';
     el.innerHTML = html;
+  }
+
+  // ── Drawer ────────────────────────────────────────────────
+
+  var _prevFocusEl = null;
+
+  function openDrawer() {
+    var drawer = document.getElementById("console-drawer");
+    var backdrop = document.getElementById("drawer-backdrop");
+    if (!drawer || !backdrop) return;
+    _prevFocusEl = document.activeElement;
+    drawer.hidden = false;
+    backdrop.hidden = false;
+    requestAnimationFrame(function () {
+      drawer.classList.add("drawer-open");
+      backdrop.classList.add("drawer-backdrop-visible");
+      var firstFocusable = drawer.querySelector("button, [href], input, select, textarea, [tabindex]:not([tabindex=\"-1\"])");
+      if (firstFocusable) firstFocusable.focus();
+    });
+  }
+
+  function closeDrawer() {
+    var drawer = document.getElementById("console-drawer");
+    var backdrop = document.getElementById("drawer-backdrop");
+    if (!drawer || !backdrop) return;
+    drawer.classList.remove("drawer-open");
+    backdrop.classList.remove("drawer-backdrop-visible");
+    setTimeout(function () {
+      drawer.hidden = true;
+      backdrop.hidden = true;
+      if (_prevFocusEl && _prevFocusEl.focus) _prevFocusEl.focus();
+      _prevFocusEl = null;
+    }, 320);
+  }
+
+  function trapFocus(e) {
+    var drawer = document.getElementById("console-drawer");
+    if (!drawer || drawer.hidden) return;
+    var focusables = drawer.querySelectorAll("button, [href], input, select, textarea, [tabindex]:not([tabindex=\"-1\"])");
+    if (!focusables.length) return;
+    var first = focusables[0];
+    var last = focusables[focusables.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
+
+  function mountDrawer() {
+    var openBtn = document.getElementById("console-open-btn");
+    if (openBtn) openBtn.addEventListener("click", openDrawer);
+
+    var closeBtn = document.getElementById("drawer-close-btn");
+    if (closeBtn) closeBtn.addEventListener("click", closeDrawer);
+
+    var backdrop = document.getElementById("drawer-backdrop");
+    if (backdrop) backdrop.addEventListener("click", closeDrawer);
+
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") closeDrawer();
+      if (e.key === "Tab") trapFocus(e);
+    });
   }
 
   // ── Intro overlay (轻量版 ≤ 1000ms) ────────────────────────
@@ -1016,17 +1179,67 @@
     startSlot();
   }
 
+  // ── Data source display ────────────────────────────────────
+
+  function updateModePill(orgData) {
+    var el = document.getElementById("mode-pill");
+    if (!el) return;
+    var ds = orgData && orgData.data_source;
+    if (!ds) { el.textContent = "只读"; return; }
+    if (ds.mode === "runtime_snapshot") {
+      el.textContent = (ds.label || "运行快照") + " · 只读";
+    } else {
+      el.textContent = "演示模式 · 只读";
+    }
+  }
+
+  function updateFooterMeta(orgData) {
+    var el = document.getElementById("footer-meta");
+    if (!el) return;
+    var ds = orgData && orgData.data_source;
+    var redactionLabel = (ds && ds.mode === "runtime_snapshot") ? "运行快照已脱敏" : "演示样本已脱敏";
+    var suffix = " · 二〇二六";
+    if (ds && ds.mode === "runtime_snapshot" && ds.generated_at) {
+      suffix = " · 生成 " + formatDateTime(new Date(ds.generated_at)) + suffix;
+    }
+    el.textContent = "职链 HireLoop · " + redactionLabel + suffix;
+  }
+
+  function renderDataSource(orgData) {
+    updateModePill(orgData);
+    updateFooterMeta(orgData);
+  }
+
   // ── Load all ──────────────────────────────────────────────
+
+  var REPORT_DRAWER_MAP = {
+    "release-gate-content": { healthKey: "releaseGate", drawerId: "drawer-release-gate", title: "交付检查" },
+    "api-audit-content": { healthKey: "apiAudit", drawerId: "drawer-api-audit", title: "API 边界审计" },
+    "pre-api-freeze-content": { healthKey: "preApiFreeze", drawerId: "drawer-pre-api-freeze", title: "架构冻结" },
+    "live-readiness-content": { healthKey: "liveReadiness", drawerId: "drawer-live-readiness", title: "在线写入就绪" },
+    "provider-readiness-content": { healthKey: "providerReadiness", drawerId: "drawer-provider-readiness", title: "就绪状态" },
+    "provider-smoke-content": { healthKey: "providerSmoke", drawerId: "drawer-provider-smoke", title: "连通测试" },
+    "provider-agent-demo-content": { healthKey: "providerAgentDemo", drawerId: "drawer-provider-agent-demo", title: "Agent 演示" },
+  };
 
   function safeCatch(elementId) {
     return function () {
       var el = document.getElementById(elementId);
       if (el) el.innerHTML = errorHtml();
+
+      var mapping = REPORT_DRAWER_MAP[elementId];
+      if (mapping) {
+        consoleHealthState[mapping.healthKey].error = true;
+        consoleHealthState[mapping.healthKey].ok = false;
+        renderDrawerError(mapping.drawerId, mapping.title);
+        updateConsoleBadge();
+      }
     };
   }
 
   function load() {
     mountIntroOverlay();
+    mountDrawer();
     setHeaderTime();
     setInterval(setHeaderTime, 30000);
 
@@ -1036,6 +1249,7 @@
     ]).then(function (results) {
       var orgData = results[0];
       var eventsData = results[1];
+      renderDataSource(orgData);
       renderHero(orgData, eventsData);
       renderOrgOverview(orgData, eventsData);
       renderWorkEvents(eventsData);
@@ -1056,13 +1270,28 @@
     });
 
     fetchJson("/api/operator/tasks").then(renderOperatorTasks).catch(safeCatch("operator-tasks-container"));
-    fetchJson("/api/reports/release-gate").then(renderReleaseGate).catch(safeCatch("release-gate-content"));
-    fetchJson("/api/reports/api-boundary-audit").then(renderApiAudit).catch(safeCatch("api-audit-content"));
-    fetchJson("/api/reports/pre-api-freeze").then(renderPreApiFreeze).catch(safeCatch("pre-api-freeze-content"));
-    fetchJson("/api/reports/live-readiness").then(renderLiveReadiness).catch(safeCatch("live-readiness-content"));
-    fetchJson("/api/reports/provider-readiness").then(renderProviderReadiness).catch(safeCatch("provider-readiness-content"));
-    fetchJson("/api/reports/provider-smoke").then(renderProviderSmoke).catch(safeCatch("provider-smoke-content"));
-    fetchJson("/api/reports/provider-agent-demo").then(renderProviderAgentDemo).catch(safeCatch("provider-agent-demo-content"));
+
+    fetchJson("/api/reports/release-gate")
+      .then(function (d) { renderReleaseGate(d); updateConsoleBadge(); })
+      .catch(safeCatch("release-gate-content"));
+    fetchJson("/api/reports/api-boundary-audit")
+      .then(function (d) { renderApiAudit(d); updateConsoleBadge(); })
+      .catch(safeCatch("api-audit-content"));
+    fetchJson("/api/reports/pre-api-freeze")
+      .then(function (d) { renderPreApiFreeze(d); updateConsoleBadge(); })
+      .catch(safeCatch("pre-api-freeze-content"));
+    fetchJson("/api/reports/live-readiness")
+      .then(function (d) { renderLiveReadiness(d); updateConsoleBadge(); })
+      .catch(safeCatch("live-readiness-content"));
+    fetchJson("/api/reports/provider-readiness")
+      .then(function (d) { renderProviderReadiness(d); updateConsoleBadge(); })
+      .catch(safeCatch("provider-readiness-content"));
+    fetchJson("/api/reports/provider-smoke")
+      .then(function (d) { renderProviderSmoke(d); updateConsoleBadge(); })
+      .catch(safeCatch("provider-smoke-content"));
+    fetchJson("/api/reports/provider-agent-demo")
+      .then(function (d) { renderProviderAgentDemo(d); updateConsoleBadge(); })
+      .catch(safeCatch("provider-agent-demo-content"));
   }
 
   load();
