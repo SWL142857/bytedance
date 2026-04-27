@@ -14,11 +14,11 @@ describe("base command planner — setup plan command shape", () => {
     assert.equal(plan.unsupportedFields.length, 0, `Unsupported: ${plan.unsupportedFields.map((u) => `${u.tableName}.${u.fieldName}: ${u.fieldType}`).join(", ")}`);
   });
 
-  it("contains commands for all 7 tables", () => {
+  it("contains commands for all 8 tables", () => {
     const tableCreateCmds = plan.commands.filter(
       (c) => c.description.includes("Create table"),
     );
-    assert.equal(tableCreateCmds.length, 7);
+    assert.equal(tableCreateCmds.length, 8);
 
     const tableNames = tableCreateCmds.map((c) => {
       const idx = c.args.indexOf("--name");

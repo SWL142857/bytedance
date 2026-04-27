@@ -34,10 +34,34 @@ export type {
 } from "./report.ts";
 
 export type {
+  WorkEvent,
+  WorkEventType,
+  WorkEventToolType,
+  WorkEventExecutionMode,
+  WorkEventGuardStatus,
+  WorkEventLinkStatus,
+  WorkEventLinkType,
+  SafeLinkView,
+  SafeWorkEventView,
+  OrgOverviewAgentView,
+  OrgOverviewPipelineView,
+  OrgOverviewSafetyView,
+  OrgOverviewView,
+} from "./work-event.ts";
+
+export type {
   CandidateStatus,
   ScreeningRecommendation,
   HumanDecision,
   StateTransition,
 } from "./state.ts";
+
+export type {
+  OperatorTaskKind,
+  OperatorTaskCategory,
+  OperatorTaskAvailability,
+  SafeOperatorTaskView,
+  OperatorTasksOverviewView,
+} from "./operator-task.ts";
 
 export type { ActorType } from "../orchestrator/state-machine.ts";

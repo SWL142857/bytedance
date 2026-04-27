@@ -133,6 +133,64 @@ export const AGENT_RUN_TABLE: TableDef = {
   ],
 };
 
+export const WORK_EVENT_TABLE: TableDef = {
+  name: "Work Events",
+  tableName: "work_events",
+  description: "Safe operational event log for virtual employee collaboration and guarded actions",
+  fields: [
+    { name: "event_id", type: "text", required: true, description: "Unique work event identifier (application-generated)" },
+    {
+      name: "agent_name",
+      type: "select",
+      required: true,
+      description: "Which virtual employee produced the event",
+      options: ["hr_coordinator", "resume_parser", "screening", "interview_kit", "analytics"],
+    },
+    {
+      name: "event_type",
+      type: "select",
+      required: true,
+      description: "Operational event category",
+      options: ["tool_call", "status_transition", "guard_check", "retry", "error", "human_action"],
+    },
+    {
+      name: "tool_type",
+      type: "select",
+      required: true,
+      description: "Tool family used for this event or none",
+      options: ["record_list", "record_upsert", "table_create", "llm_call", "none"],
+    },
+    { name: "target_table", type: "text", required: false, description: "Safe target table name only" },
+    {
+      name: "execution_mode",
+      type: "select",
+      required: true,
+      description: "Execution mode for this event",
+      options: ["dry_run", "live_read", "live_write", "blocked"],
+    },
+    {
+      name: "guard_status",
+      type: "select",
+      required: true,
+      description: "Guard result or none",
+      options: ["passed", "blocked", "skipped", "none"],
+    },
+    { name: "safe_summary", type: "text", required: true, description: "Chinese safe summary with no secrets or payloads" },
+    { name: "status_before", type: "text", required: false, description: "Status before event if applicable" },
+    { name: "status_after", type: "text", required: false, description: "Status after event if applicable" },
+    { name: "duration_ms", type: "number", required: true, description: "Execution duration in milliseconds" },
+    { name: "parent_run_id", type: "text", required: false, description: "Parent run identifier without reasoning content" },
+    {
+      name: "link_status",
+      type: "select",
+      required: true,
+      description: "Safe link availability for the operator console",
+      options: ["has_link", "no_link", "demo_only"],
+    },
+    { name: "created_at", type: "date", required: true, description: "Event creation timestamp" },
+  ],
+};
+
 export const REPORT_TABLE: TableDef = {
   name: "Reports",
   tableName: "reports",
@@ -157,6 +215,7 @@ export const ALL_TABLES: TableDef[] = [
   EVALUATION_TABLE,
   INTERVIEW_KIT_TABLE,
   AGENT_RUN_TABLE,
+  WORK_EVENT_TABLE,
   REPORT_TABLE,
 ];
 

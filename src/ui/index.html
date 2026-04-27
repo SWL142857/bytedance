@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>职链 HireLoop · AI 招聘虚拟组织</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="ambient-bg" aria-hidden="true"></div>
+  <div class="ambient-grid" aria-hidden="true"></div>
+
+  <header>
+    <div class="header-inner">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">职</div>
+        <div class="brand-text">
+          <span class="brand-text-zh">职链 HireLoop</span>
+          <span class="brand-text-sub">AI 招聘虚拟组织</span>
+        </div>
+        <span class="brand-tag">操作员控制台</span>
+      </div>
+      <div class="header-actions">
+        <span class="mode-pill">演示模式 · 只读</span>
+        <span class="header-time" id="header-time">—</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero anim-fade-up delay-1">
+      <div class="hero-head">
+        <div>
+          <div class="hero-title">今日组织运行总览</div>
+          <div class="hero-subtitle">五位虚拟员工在岗，与飞书 Base 协同记录每一次推进；全链路可解释、可追溯、可审计——所有真实写入仍须经人工授权。</div>
+        </div>
+        <div class="hero-pill-row">
+          <span class="hero-pill pill-success">本地链路已就绪</span>
+          <span class="hero-pill pill-brand">所有写入需人工授权</span>
+        </div>
+      </div>
+      <div class="kpi-grid" id="kpi-grid">
+        <div class="kpi-card"><div class="loading-pulse">加载中</div></div>
+      </div>
+    </section>
+
+    <section class="anim-fade-up delay-2">
+      <div class="section-label">
+        <span class="section-label-bar"></span>
+        <span class="section-label-text">组织运行总览</span>
+        <span class="section-label-hint">五位虚拟员工 · 实时状态与近况</span>
+      </div>
+      <div id="org-overview-container">
+        <div class="loading-pulse">正在加载组织总览</div>
+      </div>
+    </section>
+
+    <section class="anim-fade-up delay-3">
+      <div class="section-label">
+        <span class="section-label-bar"></span>
+        <span class="section-label-text">候选人流水线</span>
+        <span class="section-label-hint">自简历投递至人工决策的全过程</span>
+      </div>
+      <div id="pipeline-container" class="panel">
+        <div class="loading-pulse">正在初始化流水线</div>
+      </div>
+    </section>
+
+    <section class="anim-fade-up delay-4">
+      <div class="section-label">
+        <span class="section-label-bar"></span>
+        <span class="section-label-text">最近活动</span>
+        <span class="section-label-hint">虚拟员工协作时事 · 仅展示安全摘要</span>
+      </div>
+      <div id="work-events-container">
+        <div class="loading-pulse">正在加载最近活动</div>
+      </div>
+      <div id="work-events-message" class="link-message" hidden></div>
+    </section>
+
+    <section class="anim-fade-up delay-5">
+      <div class="section-label">
+        <span class="section-label-bar"></span>
+        <span class="section-label-text">操作员任务清单</span>
+        <span class="section-label-hint">当前为只读 · 真实执行须人工授权</span>
+      </div>
+      <div id="operator-tasks-container">
+        <div class="loading-pulse">正在加载任务清单</div>
+      </div>
+    </section>
+
+    <section class="anim-fade-up delay-6">
+      <div class="section-label">
+        <span class="section-label-bar"></span>
+        <span class="section-label-text">安全检查与审计</span>
+        <span class="section-label-hint">交付门禁 · 边界审计 · 架构冻结 · 写入就绪</span>
+      </div>
+      <div class="reports-grid">
+        <div class="report-card">
+          <div class="card-header"><span class="card-header-dot"></span>交付检查</div>
+          <div id="release-gate-content"><div class="loading-pulse">加载中</div></div>
+        </div>
+        <div class="report-card">
+          <div class="card-header"><span class="card-header-dot"></span>API 边界审计</div>
+          <div id="api-audit-content"><div class="loading-pulse">加载中</div></div>
+        </div>
+        <div class="report-card">
+          <div class="card-header"><span class="card-header-dot"></span>架构冻结</div>
+          <div id="pre-api-freeze-content"><div class="loading-pulse">加载中</div></div>
+        </div>
+        <div class="report-card">
+          <div class="card-header"><span class="card-header-dot"></span>在线写入就绪</div>
+          <div id="live-readiness-content"><div class="loading-pulse">加载中</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="anim-fade-up delay-7">
+      <div class="section-label">
+        <span class="section-label-bar"></span>
+        <span class="section-label-text">模型接入状态</span>
+        <span class="section-label-hint">供应商就绪 · 连通试探 · 代理演练</span>
+      </div>
+      <div class="provider-grid">
+        <div class="provider-card">
+          <div class="card-header"><span class="card-header-dot"></span>就绪状态</div>
+          <div id="provider-readiness-content"><div class="loading-pulse">加载中</div></div>
+        </div>
+        <div class="provider-card">
+          <div class="card-header"><span class="card-header-dot"></span>连通测试</div>
+          <div id="provider-smoke-content"><div class="loading-pulse">加载中</div></div>
+        </div>
+        <div class="provider-card">
+          <div class="card-header"><span class="card-header-dot"></span>Agent 演示</div>
+          <div id="provider-agent-demo-content"><div class="loading-pulse">加载中</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="virtual-runs-shadow" hidden>
+      <div class="section-label">
+        <span class="section-label-bar"></span>
+        <span class="section-label-text">虚拟员工动态</span>
+      </div>
+      <div id="agent-runs-container"></div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+      <div class="footer-pills">
+        <span class="footer-pill">只读模式</span>
+        <span class="footer-pill">仅展示安全摘要</span>
+        <span class="footer-pill">无执行操作</span>
+        <span class="footer-pill pill-info">飞书 Base 协同</span>
+      </div>
+      <div class="footer-meta">职链 HireLoop · 演示数据脱敏 · 二〇二六</div>
+    </div>
+  </footer>
+
+  <div id="intro-overlay" class="intro-overlay">
+    <div class="intro-mark">职</div>
+    <div class="intro-text">职链 HireLoop · 操作员控制台</div>
+    <div class="intro-bar"><div class="intro-bar-fill"></div></div>
+  </div>
+
+  <div id="live-capsule" class="live-capsule" hidden>
+    <span class="live-capsule-badge"><span class="live-capsule-dot"></span>在线</span>
+    <span class="live-capsule-text">—</span>
+    <span class="live-capsule-progress"><span class="live-capsule-progress-fill"></span></span>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,100 @@
+import type {
+  OperatorTasksOverviewView,
+  SafeOperatorTaskView,
+} from "../types/operator-task.js";
+
+export function buildOperatorTasksOverview(): OperatorTasksOverviewView {
+  const tasks: SafeOperatorTaskView[] = [
+    {
+      task_kind: "local_mvp_demo",
+      category: "dry_run",
+      display_name: "候选人流水线 Dry-Run",
+      description: "以确定性 demo 数据演示从 new 到 decision_pending 的命令计划，不写入飞书。",
+      availability: "available_readonly",
+      execute_enabled: false,
+      guard_summary: "只展示命令计划，不会调用真实飞书 API。",
+      blocked_reasons: [],
+    },
+    {
+      task_kind: "api_boundary_audit",
+      category: "readiness",
+      display_name: "API 边界审计",
+      description: "检查模型 API 接入边界、输出脱敏和默认安全门禁，不发起外部调用。",
+      availability: "available_readonly",
+      execute_enabled: false,
+      guard_summary: "只读取本地审计报告，不会调用外部模型或写入飞书。",
+      blocked_reasons: [],
+    },
+    {
+      task_kind: "live_readiness_report",
+      category: "readiness",
+      display_name: "Live 写入就绪报告",
+      description: "检查配置、解析、记录、写入计划与命令校验，不执行任何写命令。",
+      availability: "available_readonly",
+      execute_enabled: false,
+      guard_summary: "默认 sample 模式，只生成只读 readiness summary。",
+      blocked_reasons: [],
+    },
+    {
+      task_kind: "analytics_report",
+      category: "report",
+      display_name: "招聘分析周报",
+      description: "基于演示快照生成招聘漏斗统计与阻塞点摘要。",
+      availability: "available_readonly",
+      execute_enabled: false,
+      guard_summary: "只输出报告内容，不写入飞书 Reports 表。",
+      blocked_reasons: [],
+    },
+    {
+      task_kind: "provider_readiness",
+      category: "readiness",
+      display_name: "模型 Provider 就绪检查",
+      description: "展示 provider adapter 接入边界与禁用状态，不发起外部调用。",
+      availability: "available_readonly",
+      execute_enabled: false,
+      guard_summary: "默认 disabled / fail-closed，不会调用外部模型。",
+      blocked_reasons: [],
+    },
+    {
+      task_kind: "provider_smoke_dry_run",
+      category: "dry_run",
+      display_name: "模型连通性 Dry-Run",
+      description: "展示 provider smoke 需要的安全前置条件，不发送任何真实请求。",
+      availability: "available_readonly",
+      execute_enabled: false,
+      guard_summary: "仅展示 dry-run 计划，不读取密钥，不调用外部模型。",
+      blocked_reasons: [],
+    },
+    {
+      task_kind: "provider_agent_demo_dry_run",
+      category: "dry_run",
+      display_name: "Provider Agent 演示 Dry-Run",
+      description: "展示 provider-backed agent demo 的安全计划，不发送简历、JD 或模型请求。",
+      availability: "available_readonly",
+      execute_enabled: false,
+      guard_summary: "仅展示 opt-in 演示边界，不外呼模型，不写 Base。",
+      blocked_reasons: [],
+    },
+    {
+      task_kind: "release_gate",
+      category: "readiness",
+      display_name: "发布门禁清单",
+      description: "查看 typecheck、tests、demo、live safety、trace scan 等检查项。",
+      availability: "available_readonly",
+      execute_enabled: false,
+      guard_summary: "只读门禁清单，不触发任何执行操作。",
+      blocked_reasons: [],
+    },
+  ];
+
+  return {
+    tasks,
+    safety: {
+      read_only: true,
+      real_writes: false,
+      external_model_calls: false,
+      demo_mode: true,
+    },
+    notice: "操作员控制台尚处于 Phase 6.2 准备阶段，仅展示只读任务清单；真实执行需要后续阶段开放并经人工确认。",
+  };
+}

@@ -98,6 +98,11 @@ const SCRIPTS: ScriptCase[] = [
     script: "scripts/demo-api-boundary-release-audit.ts",
     args: [],
   },
+  {
+    name: "ui-server-startup",
+    script: "scripts/start-ui-server.ts",
+    args: ["--startup-check"],
+  },
 ];
 
 for (const { name, script, args } of SCRIPTS) {
