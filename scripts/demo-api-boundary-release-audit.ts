@@ -2,11 +2,18 @@ import {
   buildApiBoundaryReleaseAuditReport,
   type ApiBoundaryAuditInput,
 } from "../src/orchestrator/api-boundary-release-audit.js";
+import { runForbiddenTraceScan } from "../src/orchestrator/forbidden-trace-scan.js";
 
 const args = process.argv.slice(2);
 const sampleReady = args.includes("--sample-ready");
 const sampleNeedsReview = args.includes("--sample-needs-review");
 const sampleBlocked = args.includes("--sample-blocked");
+const scanRootArg = args.find((a) => a.startsWith("--scan-root-dir="));
+
+function getScanRoot(): string | undefined {
+  if (scanRootArg) return scanRootArg.slice("--scan-root-dir=".length);
+  return process.env["HIRELOOP_FORBIDDEN_TRACE_SCAN_ROOT"] || undefined;
+}
 
 function printHeader(label: string, value: string | number | boolean): void {
   console.log(`  ${label}: ${value}`);
@@ -97,6 +104,10 @@ function getScenario(): ApiBoundaryAuditInput {
     };
   }
 
+  // Default: real scan
+  const scanOpts = getScanRoot() ? { rootDir: getScanRoot() } : undefined;
+  const scanReport = runForbiddenTraceScan(scanOpts);
+
   return {
     typecheckPassed: true,
     testsPassed: true,
@@ -106,7 +117,7 @@ function getScenario(): ApiBoundaryAuditInput {
     providerAgentDemoGuarded: true,
     baseWriteGuardIndependent: true,
     outputRedactionSafe: true,
-    forbiddenTraceScanPassed: false,
+    forbiddenTraceScanPassed: scanReport.status === "pass",
     secretScanPassed: true,
     releaseGateConsistent: true,
   };

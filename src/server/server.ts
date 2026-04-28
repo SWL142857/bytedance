@@ -5,6 +5,7 @@ import { DeterministicLlmClient } from "../llm/deterministic-client.js";
 import { runCandidatePipeline } from "../orchestrator/candidate-pipeline.js";
 import { buildMvpReleaseGateReport } from "../orchestrator/mvp-release-gate.js";
 import { buildApiBoundaryReleaseAuditReport } from "../orchestrator/api-boundary-release-audit.js";
+import { runForbiddenTraceScan } from "../orchestrator/forbidden-trace-scan.js";
 import { buildProviderAdapterReadiness } from "../llm/provider-adapter.js";
 import { buildProviderSmokePlan } from "../llm/provider-smoke-runner.js";
 import { buildProviderAgentDemoPlan } from "../llm/provider-agent-demo-runner.js";
@@ -248,6 +249,25 @@ async function handleApi(
     }
 
     if (url.pathname === "/api/reports/release-gate" && req.method === "GET") {
+      const scanOpts = process.env["HIRELOOP_FORBIDDEN_TRACE_SCAN_ROOT"]
+        ? { rootDir: process.env["HIRELOOP_FORBIDDEN_TRACE_SCAN_ROOT"] }
+        : undefined;
+      const scanReport = runForbiddenTraceScan(scanOpts);
+      const scanPassed = scanReport.status === "pass";
+      // Derive apiBoundaryAuditPassed from real audit status
+      const audit = buildApiBoundaryReleaseAuditReport({
+        typecheckPassed: true,
+        testsPassed: true,
+        buildPassed: true,
+        deterministicDemoPassed: true,
+        providerSmokeGuarded: true,
+        providerAgentDemoGuarded: true,
+        baseWriteGuardIndependent: true,
+        outputRedactionSafe: true,
+        forbiddenTraceScanPassed: scanPassed,
+        secretScanPassed: true,
+        releaseGateConsistent: true,
+      });
       const report = buildMvpReleaseGateReport({
         typecheckPassed: true,
         testsPassed: true,
@@ -255,14 +275,18 @@ async function handleApi(
         liveReadyDemoPassed: true,
         liveRunbookAvailable: true,
         guardedExecuteBlocksWithoutConfig: true,
-        apiBoundaryAuditPassed: true,
-        forbiddenTraceScanPassed: false,
+        apiBoundaryAuditPassed: audit.status !== "blocked",
+        forbiddenTraceScanPassed: scanPassed,
       });
       jsonResponse(res, redactReleaseGate(report));
       return;
     }
 
     if (url.pathname === "/api/reports/api-boundary-audit" && req.method === "GET") {
+      const scanOpts = process.env["HIRELOOP_FORBIDDEN_TRACE_SCAN_ROOT"]
+        ? { rootDir: process.env["HIRELOOP_FORBIDDEN_TRACE_SCAN_ROOT"] }
+        : undefined;
+      const scanReport = runForbiddenTraceScan(scanOpts);
       const report = buildApiBoundaryReleaseAuditReport({
         typecheckPassed: true,
         testsPassed: true,
@@ -272,7 +296,7 @@ async function handleApi(
         providerAgentDemoGuarded: true,
         baseWriteGuardIndependent: true,
         outputRedactionSafe: true,
-        forbiddenTraceScanPassed: false,
+        forbiddenTraceScanPassed: scanReport.status === "pass",
         secretScanPassed: true,
         releaseGateConsistent: true,
       });

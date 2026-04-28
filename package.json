@@ -38,7 +38,8 @@
     "mvp:api-boundary-audit": "node --import tsx scripts/demo-api-boundary-release-audit.ts",
     "dataset:run": "node --import tsx scripts/run-live-agent-dataset.ts",
     "provider:dataset-verify": "node --import tsx scripts/run-provider-dataset-verify.ts",
-    "ui:dev": "node --import tsx scripts/start-ui-server.ts"
+    "ui:dev": "node --import tsx scripts/start-ui-server.ts",
+    "scan:forbidden-traces": "node --import tsx scripts/run-forbidden-trace-scan.ts"
   },
   "keywords": [
     "recruitment",

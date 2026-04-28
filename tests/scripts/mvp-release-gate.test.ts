@@ -1,6 +1,9 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 function runScript(args: string[] = []) {
   const env = { ...process.env };
@@ -20,16 +23,26 @@ function runScript(args: string[] = []) {
   );
 }
 
+function buildCleanRoot(dir: string): void {
+  writeFileSync(join(dir, "README.md"), "# Clean\n");
+  mkdirSync(join(dir, "src"));
+  writeFileSync(join(dir, "src", "app.ts"), "export const x = 1;\n");
+  writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "test" }));
+}
+
+function buildDirtyRoot(dir: string): void {
+  writeFileSync(join(dir, "README.md"), "# Dirty\n");
+  mkdirSync(join(dir, "src"));
+  writeFileSync(join(dir, "src", "leak.ts"),
+    ["MODEL_API_KEY", "=", "realProdKey123456"].join("") + ";\n",
+  );
+  writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "test" }));
+}
+
 const SENSITIVE_PATTERNS = [
-  "--json",
-  "--base-token",
-  "rec_demo_job_001",
-  "AI Product Manager with 6 years",
-  "raw stdout",
-  "payload",
-  "token",
-  "stdout",
-  "raw stderr",
+  "--json", "--base-token", "realProdKey123456",
+  "rec_demo_job_001", "AI Product Manager with 6 years",
+  "raw stdout", "payload", "token", "stdout", "raw stderr",
   "mvp:live-write:execute",
 ] as const;
 
@@ -42,7 +55,6 @@ function assertNoSensitiveData(output: string): void {
 describe("mvp release gate script - default", () => {
   it("outputs release gate structure", () => {
     const result = runScript();
-
     assert.equal(result.status, 0);
     assert.match(result.stdout, /=== MVP Release Gate ===/);
     assert.match(result.stdout, /Status:/);
@@ -77,7 +89,6 @@ describe("mvp release gate script - default", () => {
 describe("mvp release gate script - sample-ready", () => {
   it("outputs ready_for_demo", () => {
     const result = runScript(["--sample-ready"]);
-
     assert.equal(result.status, 0);
     assert.match(result.stdout, /Status: ready_for_demo/);
     assert.match(result.stdout, /Local Demo Ready: true/);
@@ -86,7 +97,6 @@ describe("mvp release gate script - sample-ready", () => {
 
   it("all checks pass", () => {
     const result = runScript(["--sample-ready"]);
-
     assert.equal(result.status, 0);
     assert.match(result.stdout, /\[PASS\] Typecheck:/);
     assert.match(result.stdout, /\[PASS\] Test Suite:/);
@@ -105,7 +115,6 @@ describe("mvp release gate script - sample-ready", () => {
 describe("mvp release gate script - sample-needs-review", () => {
   it("outputs needs_review", () => {
     const result = runScript(["--sample-needs-review"]);
-
     assert.equal(result.status, 0);
     assert.match(result.stdout, /Status: needs_review/);
     assert.match(result.stdout, /Live Safety Ready: false/);
@@ -121,7 +130,6 @@ describe("mvp release gate script - sample-needs-review", () => {
 describe("mvp release gate script - sample-blocked", () => {
   it("outputs blocked", () => {
     const result = runScript(["--sample-blocked"]);
-
     assert.equal(result.status, 0);
     assert.match(result.stdout, /Status: blocked/);
     assert.match(result.stdout, /Local Demo Ready: false/);
@@ -129,7 +137,6 @@ describe("mvp release gate script - sample-blocked", () => {
 
   it("shows blocked checks", () => {
     const result = runScript(["--sample-blocked"]);
-
     assert.equal(result.status, 0);
     assert.match(result.stdout, /\[BLOCK\] Typecheck:/);
     assert.match(result.stdout, /\[BLOCK\] Test Suite:/);
@@ -140,5 +147,73 @@ describe("mvp release gate script - sample-blocked", () => {
     const result = runScript(["--sample-blocked"]);
     assert.equal(result.status, 0);
     assertNoSensitiveData(`${result.stdout}\n${result.stderr}`);
+  });
+});
+
+describe("mvp release gate script - --scan-root-dir", () => {
+  it("clean root => Forbidden Trace Scan pass", () => {
+    const dir = mkdtempSync(join(tmpdir(), "hireloop-rg-clean-"));
+    try {
+      buildCleanRoot(dir);
+      const result = runScript([`--scan-root-dir=${dir}`]);
+      assert.equal(result.status, 0);
+      assert.match(result.stdout, /\[PASS\] Forbidden Trace Scan/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("clean root => release gate not stuck on audit", () => {
+    const dir = mkdtempSync(join(tmpdir(), "hireloop-rg-audit-"));
+    try {
+      buildCleanRoot(dir);
+      const result = runScript([`--scan-root-dir=${dir}`]);
+      assert.equal(result.status, 0);
+      // API Boundary Audit should not be BLOCK when scan passes
+      assert.ok(
+        !result.stdout.includes("[BLOCK] API Boundary Audit"),
+        "API Boundary Audit should not be BLOCK when scan passes",
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("dirty root => Forbidden Trace Scan block", () => {
+    const dir = mkdtempSync(join(tmpdir(), "hireloop-rg-dirty-"));
+    try {
+      buildDirtyRoot(dir);
+      const result = runScript([`--scan-root-dir=${dir}`]);
+      assert.equal(result.status, 0);
+      assert.match(result.stdout, /\[BLOCK\] Forbidden Trace Scan/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("sample-ready does not depend on scan root", () => {
+    const result = runScript(["--sample-ready"]);
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /\[PASS\] Forbidden Trace Scan/);
+  });
+});
+
+describe("mvp release gate script - default with real scanner", () => {
+  it("default path includes Forbidden Trace Scan check", () => {
+    const result = runScript();
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /Forbidden Trace Scan/);
+  });
+
+  it("sample-ready shows PASS for forbidden trace scan", () => {
+    const result = runScript(["--sample-ready"]);
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /\[PASS\] Forbidden Trace Scan/);
+  });
+
+  it("sample-blocked shows BLOCK for forbidden trace scan", () => {
+    const result = runScript(["--sample-blocked"]);
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /\[BLOCK\] Forbidden Trace Scan/);
   });
 });

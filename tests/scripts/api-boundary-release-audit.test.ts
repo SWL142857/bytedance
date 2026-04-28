@@ -1,6 +1,9 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 function runScript(args: string[] = []) {
   const env = { ...process.env };
@@ -23,25 +26,31 @@ function runScript(args: string[] = []) {
   );
 }
 
+function buildCleanRoot(dir: string): void {
+  writeFileSync(join(dir, "README.md"), "# Clean\n");
+  mkdirSync(join(dir, "src"));
+  writeFileSync(join(dir, "src", "app.ts"), "export const x = 1;\n");
+  writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "test" }));
+}
+
+function buildDirtyRoot(dir: string): void {
+  writeFileSync(join(dir, "README.md"), "# Dirty\n");
+  mkdirSync(join(dir, "src"));
+  writeFileSync(join(dir, "src", "leak.ts"),
+    ["MODEL_API_KEY", "=", "realProdKey123456"].join("") + ";\n",
+  );
+  writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "test" }));
+}
+
 const SENSITIVE_PATTERNS = [
-  "--json",
-  "--base-token",
-  "rec_demo_job_001",
-  "rec_demo_candidate_001",
+  "--json", "--base-token", "realProdKey123456",
+  "rec_demo_job_001", "rec_demo_candidate_001",
   "AI Product Manager with 6 years",
-  "raw stdout",
-  "payload",
-  "token",
-  "stdout",
-  "raw stderr",
-  "mvp:live-write:execute",
-  "mvp:provider-smoke:execute",
+  "raw stdout", "payload", "token", "stdout", "raw stderr",
+  "mvp:live-write:execute", "mvp:provider-smoke:execute",
   "mvp:provider-agent-demo:execute",
-  "MODEL_API_ENDPOINT",
-  "MODEL_ID",
-  "MODEL_API_KEY",
-  "Bearer",
-  "Authorization",
+  "MODEL_API_ENDPOINT", "MODEL_ID", "MODEL_API_KEY",
+  "Bearer", "Authorization",
 ] as const;
 
 function assertNoSensitiveData(output: string): void {
@@ -171,5 +180,60 @@ describe("api boundary audit script - sample-blocked", () => {
     const result = runScript(["--sample-blocked"]);
     assert.equal(result.status, 0);
     assertNoSensitiveData(`${result.stdout}\n${result.stderr}`);
+  });
+});
+
+describe("api boundary audit script - --scan-root-dir", () => {
+  it("clean root => Forbidden Trace Scan pass and status ready", () => {
+    const dir = mkdtempSync(join(tmpdir(), "hireloop-ab-clean-"));
+    try {
+      buildCleanRoot(dir);
+      const result = runScript([`--scan-root-dir=${dir}`]);
+      assert.equal(result.status, 0);
+      assert.match(result.stdout, /Forbidden Trace Scan Passed: true/);
+      assert.match(result.stdout, /Status: ready/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("dirty root => Forbidden Trace Scan block and status blocked", () => {
+    const dir = mkdtempSync(join(tmpdir(), "hireloop-ab-dirty-"));
+    try {
+      buildDirtyRoot(dir);
+      const result = runScript([`--scan-root-dir=${dir}`]);
+      assert.equal(result.status, 0);
+      assert.match(result.stdout, /Forbidden Trace Scan Passed: false/);
+      assert.match(result.stdout, /Status: blocked/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("sample flags keep original behavior", () => {
+    const result = runScript(["--sample-ready"]);
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /Forbidden Trace Scan Passed: true/);
+    assert.match(result.stdout, /Status: ready/);
+  });
+});
+
+describe("api boundary audit script - default with real scanner", () => {
+  it("default path includes Forbidden Trace Scan check", () => {
+    const result = runScript();
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /Forbidden Trace Scan Passed/);
+  });
+
+  it("sample-ready shows PASS for forbidden trace scan", () => {
+    const result = runScript(["--sample-ready"]);
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /\[PASS\] Forbidden Trace Scan/);
+  });
+
+  it("sample-blocked shows BLOCK for forbidden trace scan", () => {
+    const result = runScript(["--sample-blocked"]);
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /\[BLOCK\] Forbidden Trace Scan/);
   });
 });

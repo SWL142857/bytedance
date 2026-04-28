@@ -61,6 +61,11 @@ describe("server API routes", () => {
     assert.equal(data.title, "MVP Release Gate");
     assert.equal(data.realWritePermittedByReport, false);
     assert.equal(data.externalModelCallPermittedByReport, false);
+    // Forbidden Trace Scan check uses real scanner now, not hardcoded
+    const checks = data.checks as Array<{ name: string; status: string }>;
+    const ftCheck = checks.find((c) => c.name.includes("Forbidden") || c.name.includes("forbidden"));
+    assert.ok(ftCheck, "Should have Forbidden Trace Scan check");
+    assert.match(ftCheck!.status, /^(pass|block)$/);
   });
 
   it("GET /api/reports/api-boundary-audit returns audit report", async () => {
@@ -68,6 +73,26 @@ describe("server API routes", () => {
     assert.equal(data.title, "API Boundary Release Audit");
     assert.equal(data.defaultExternalModelCallsPermittedByReport, false);
     assert.equal(data.realBaseWritesPermittedByReport, false);
+    // Forbidden Trace Scan check uses real scanner now, not hardcoded
+    const checks = data.checks as Array<{ name: string; status: string }>;
+    const ftCheck = checks.find((c) => c.name.includes("Forbidden") || c.name.includes("forbidden"));
+    assert.ok(ftCheck, "Should have Forbidden Trace Scan check");
+    assert.match(ftCheck!.status, /^(pass|block)$/);
+  });
+
+  it("release gate and api boundary audit responses do not leak forbidden trace findings", async () => {
+    const paths = ["/api/reports/release-gate", "/api/reports/api-boundary-audit"];
+    for (const path of paths) {
+      const res = await fetch(`${BASE_URL}${path}`);
+      const text = await res.text();
+      assert.ok(!text.includes("findingCount"), `${path} must not leak findingCount`);
+      assert.ok(!text.includes("findings"), `${path} must not leak findings array`);
+      assert.ok(!text.includes("categories"), `${path} must not leak scan categories`);
+      assert.ok(!text.includes("secret_marker"), `${path} must not leak scan category names`);
+      assert.ok(!text.includes("unsafe_raw_field"), `${path} must not leak scan category names`);
+      assert.ok(!text.includes("unsafe_output_token"), `${path} must not leak scan category names`);
+      assert.ok(!text.includes("Forbidden trace pattern detected"), `${path} must not leak scan safeSummary text`);
+    }
   });
 
   it("GET /api/reports/provider-readiness returns provider readiness", async () => {
