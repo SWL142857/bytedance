@@ -289,6 +289,136 @@ describe("runProviderDatasetVerify (injectable)", () => {
     assert.equal(result.completedCount, 0);
     assert.equal(result.failedCount, 1);
   });
+
+  it("ready + correct confirm + runner mode=deterministic with all-success counts => status=failed", async () => {
+    const result = await runProviderDatasetVerify({
+      executeProvider: true,
+      confirm: VALID_CONFIRM,
+      deps: {
+        loadConfig: () => fakeReadyConfig(),
+        runLiveAgentDataset: async () =>
+          mockRunnerResult({
+            mode: "deterministic",
+            totalCandidates: 1,
+            completedCount: 1,
+            failedCount: 0,
+          }),
+      },
+    });
+
+    assert.equal(result.status, "failed");
+    assert.equal(result.externalModelCalls, false);
+    assert.equal(result.snapshotWritten, false);
+    assert.equal(
+      result.safeSummary,
+      "Provider dataset verification did not execute provider mode.",
+    );
+    const json = JSON.stringify(result);
+    const forbidden = [
+      "snapshotPath", "payload", "prompt", "resumeText",
+      "rec_", "cand_", "job_", "apiKey", "endpoint", "modelId",
+    ];
+    for (const f of forbidden) {
+      assert.ok(!json.includes(f), `Result must not contain: "${f}"`);
+    }
+  });
+
+  it("ready + correct confirm + runner mode=provider_blocked => status=blocked", async () => {
+    const result = await runProviderDatasetVerify({
+      executeProvider: true,
+      confirm: VALID_CONFIRM,
+      deps: {
+        loadConfig: () => fakeReadyConfig(),
+        runLiveAgentDataset: async () =>
+          mockRunnerResult({
+            mode: "provider_blocked",
+            totalCandidates: 0,
+            completedCount: 0,
+            failedCount: 0,
+          }),
+      },
+    });
+
+    assert.equal(result.status, "blocked");
+    assert.equal(result.externalModelCalls, false);
+    assert.equal(result.snapshotWritten, false);
+    assert.equal(
+      result.safeSummary,
+      "Provider dataset runner blocked provider execution.",
+    );
+    const json = JSON.stringify(result);
+    const forbidden = [
+      "snapshotPath", "payload", "prompt", "resumeText",
+      "rec_", "cand_", "job_", "apiKey", "endpoint", "modelId",
+    ];
+    for (const f of forbidden) {
+      assert.ok(!json.includes(f), `Result must not contain: "${f}"`);
+    }
+  });
+
+  it("ready + correct confirm + runner mode=provider but totalCandidates=0 => status=failed", async () => {
+    const result = await runProviderDatasetVerify({
+      executeProvider: true,
+      confirm: VALID_CONFIRM,
+      deps: {
+        loadConfig: () => fakeReadyConfig(),
+        runLiveAgentDataset: async () =>
+          mockRunnerResult({
+            mode: "provider",
+            totalCandidates: 0,
+            completedCount: 0,
+            failedCount: 0,
+          }),
+      },
+    });
+
+    assert.equal(result.status, "failed");
+    assert.equal(result.snapshotWritten, false);
+    assert.equal(result.externalModelCalls, false);
+    assert.equal(
+      result.safeSummary,
+      "Provider dataset verification did not complete all candidates.",
+    );
+    const json = JSON.stringify(result);
+    const forbidden = [
+      "snapshotPath", "payload", "prompt", "resumeText", "resume_text",
+      "rec_", "cand_", "job_", "apiKey", "endpoint", "modelId",
+      "api_key", "model_id",
+    ];
+    for (const f of forbidden) {
+      assert.ok(!json.includes(f), `Result must not contain: "${f}"`);
+    }
+  });
+
+  it("ready + correct confirm + runner mode=provider nonzero incomplete => snapshotWritten true, safeSummary fixed", async () => {
+    const result = await runProviderDatasetVerify({
+      executeProvider: true,
+      confirm: VALID_CONFIRM,
+      deps: {
+        loadConfig: () => fakeReadyConfig(),
+        runLiveAgentDataset: async () =>
+          mockRunnerResult({
+            mode: "provider",
+            totalCandidates: 1,
+            completedCount: 0,
+            failedCount: 1,
+            safeSummary: "Processed 1 candidates: 0 completed, 1 stopped. Sensitive: rec_XYZ payload leak",
+          }),
+      },
+    });
+
+    assert.equal(result.status, "failed");
+    assert.equal(result.snapshotWritten, true);
+    assert.equal(result.externalModelCalls, true);
+    assert.equal(
+      result.safeSummary,
+      "Provider dataset verification did not complete all candidates.",
+    );
+    const json = JSON.stringify(result);
+    assert.ok(!json.includes("rec_XYZ"), "Must not leak runner safeSummary content");
+    assert.ok(!json.includes("payload leak"), "Must not leak runner safeSummary content");
+    assert.ok(!json.includes("Sensitive"), "Must not leak runner safeSummary content");
+  });
 });
 
 // ═══════════════════════════════════════

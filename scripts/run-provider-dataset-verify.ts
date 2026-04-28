@@ -98,16 +98,59 @@ function failedResult(): VerifyResult {
 }
 
 function fromRunnerResult(r: DatasetRunnerResult): VerifyResult {
+  if (r.mode === "provider_blocked") {
+    return {
+      status: "blocked",
+      mode: r.mode,
+      totalCandidates: r.totalCandidates,
+      completedCount: r.completedCount,
+      failedCount: r.failedCount,
+      totalCommands: r.totalCommands,
+      snapshotWritten: false,
+      externalModelCalls: false,
+      safeSummary: "Provider dataset runner blocked provider execution.",
+    };
+  }
+
+  if (r.mode !== "provider") {
+    return {
+      status: "failed",
+      mode: r.mode,
+      totalCandidates: r.totalCandidates,
+      completedCount: r.completedCount,
+      failedCount: r.failedCount,
+      totalCommands: r.totalCommands,
+      snapshotWritten: false,
+      externalModelCalls: false,
+      safeSummary: "Provider dataset verification did not execute provider mode.",
+    };
+  }
+
+  if (r.totalCandidates <= 0) {
+    return {
+      status: "failed",
+      mode: r.mode,
+      totalCandidates: r.totalCandidates,
+      completedCount: r.completedCount,
+      failedCount: r.failedCount,
+      totalCommands: r.totalCommands,
+      snapshotWritten: false,
+      externalModelCalls: false,
+      safeSummary: "Provider dataset verification did not complete all candidates.",
+    };
+  }
+
+  const passed = r.completedCount === r.totalCandidates && r.failedCount === 0;
   return {
-    status: r.completedCount === r.totalCandidates && r.failedCount === 0 ? "passed" : "failed",
+    status: passed ? "passed" : "failed",
     mode: r.mode,
     totalCandidates: r.totalCandidates,
     completedCount: r.completedCount,
     failedCount: r.failedCount,
     totalCommands: r.totalCommands,
-    snapshotWritten: r.mode !== "provider_blocked",
-    externalModelCalls: r.mode === "provider",
-    safeSummary: r.safeSummary,
+    snapshotWritten: true,
+    externalModelCalls: true,
+    safeSummary: passed ? r.safeSummary : "Provider dataset verification did not complete all candidates.",
   };
 }
 
