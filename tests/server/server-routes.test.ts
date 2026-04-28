@@ -622,6 +622,27 @@ describe("server API routes", () => {
     assert.ok(res.headers.get("content-type")?.includes("javascript"));
   });
 
+  it("GET UI ES modules serves JS", async () => {
+    const modules = [
+      "app.js",
+      "constants.js",
+      "helpers.js",
+      "safety-badge.js",
+      "drawer.js",
+      "work-events.js",
+      "pipeline.js",
+      "operator-tasks.js",
+      "reports.js",
+      "live-records.js",
+      "candidate-detail.js",
+    ];
+    for (const mod of modules) {
+      const res = await fetch(`${BASE_URL}/${mod}`);
+      assert.ok(res.ok, `${mod} must be served`);
+      assert.ok(res.headers.get("content-type")?.includes("javascript"), `${mod} must be served as JS`);
+    }
+  });
+
   it("HEAD / serves headers without a body", async () => {
     const res = await fetch(`${BASE_URL}/`, { method: "HEAD" });
     assert.ok(res.ok);
@@ -723,25 +744,40 @@ describe("server API routes", () => {
     }
   });
 
-  it("app.js renders link.available-gated event links without real Feishu URLs", async () => {
-    const res = await fetch(`${BASE_URL}/app.js`);
-    const text = await res.text();
-    assert.ok(text.includes("available"), "app.js must check link.available");
-    assert.ok(text.includes("event-link-unavailable"), "app.js must include unavailable link class");
-    assert.ok(text.includes("飞书记录未接入"), "app.js must include unavailable link text");
-    assert.ok(!text.includes("feishu.cn"), "app.js must not reference real feishu.cn URLs");
-    assert.ok(!text.includes("larksuite.com"), "app.js must not reference real larksuite URLs");
-    assert.ok(!text.includes("base_app_token"), "app.js must not contain base_app_token");
+  it("UI modules render link.available-gated event links without real Feishu URLs", async () => {
+    const workRes = await fetch(`${BASE_URL}/work-events.js`);
+    const workText = await workRes.text();
+    assert.ok(workText.includes("event-link-unavailable"), "work-events.js must include unavailable link class");
+    assert.ok(workText.includes("飞书记录未接入"), "work-events.js must include unavailable link text");
+    for (const mod of ["app.js", "work-events.js", "live-records.js", "candidate-detail.js"]) {
+      const res = await fetch(`${BASE_URL}/${mod}`);
+      const text = await res.text();
+      assert.ok(!text.includes("feishu.cn"), `${mod} must not reference real feishu.cn URLs`);
+      assert.ok(!text.includes("larksuite.com"), `${mod} must not reference real larksuite URLs`);
+      assert.ok(!text.includes("base_app_token"), `${mod} must not contain base_app_token`);
+    }
   });
 
-  it("app.js live Feishu buttons open /go route directly for browser redirects", async () => {
-    const appRes = await fetch(`${BASE_URL}/app.js`);
-    const appText = await appRes.text();
+  it("UI modules expose live Feishu buttons via browser redirects", async () => {
+    const liveRes = await fetch(`${BASE_URL}/live-records.js`);
+    const liveText = await liveRes.text();
     const indexRes = await fetch(`${BASE_URL}/`);
     const indexText = await indexRes.text();
-    assert.ok(appText.includes("window._hireloopOpenFeishu"), "app.js must expose live open helper");
-    assert.ok(appText.includes('window.open("/go/" + encodeURIComponent(linkId)'), "live links must use browser navigation, not fetch redirects");
+    assert.ok(liveText.includes("window._hireloopOpenFeishu"), "live-records.js must expose live open helper");
+    assert.ok(liveText.includes('window.open("/go/" + encodeURIComponent(linkId)'), "live links must use browser navigation, not fetch redirects");
     assert.ok(indexText.includes("飞书实时数据"), "index.html must render live Feishu data section");
+  });
+
+  it("live records opens candidate detail only from candidate rows", async () => {
+    const liveRes = await fetch(`${BASE_URL}/live-records.js`);
+    const liveText = await liveRes.text();
+    const jobCallStart = liveText.indexOf('renderLiveRecords(\n            "live-jobs"');
+    const jobCallEnd = liveText.indexOf(");", jobCallStart);
+    const jobCall = jobCallStart >= 0 && jobCallEnd >= 0 ? liveText.slice(jobCallStart, jobCallEnd) : "";
+    assert.ok(liveText.includes("onRowClick"), "candidate rows should use explicit row click wiring");
+    assert.ok(liveText.includes("window._hireloopOpenCandidateDetail(linkId, candidateData)"), "candidate rows should open detail panel");
+    assert.ok(jobCallStart >= 0, "jobs list render call should exist");
+    assert.ok(!jobCall.includes("onRowClick"), "jobs rows must not open candidate detail panel");
   });
 
   it("app.js does not encourage live execute write actions", async () => {
@@ -752,29 +788,60 @@ describe("server API routes", () => {
     assert.ok(!text.includes("--execute"), "app.js must not embed execute CLI args");
   });
 
-  it("app.js and index.html include source hints for static-only sections", async () => {
-    const appRes = await fetch(`${BASE_URL}/app.js`);
-    const appText = await appRes.text();
+  it("all UI modules do not contain EXECUTE_LIVE_CANDIDATE_WRITES or /execute-writes", async () => {
+    const modules = [
+      "app.js",
+      "constants.js",
+      "helpers.js",
+      "safety-badge.js",
+      "drawer.js",
+      "work-events.js",
+      "pipeline.js",
+      "operator-tasks.js",
+      "reports.js",
+      "live-records.js",
+      "candidate-detail.js",
+    ];
+    for (const mod of modules) {
+      const res = await fetch(`${BASE_URL}/${mod}`);
+      const text = await res.text();
+      assert.ok(!text.includes("EXECUTE_LIVE_CANDIDATE_WRITES"), `${mod} must not contain EXECUTE_LIVE_CANDIDATE_WRITES`);
+      assert.ok(!text.includes("/execute-writes"), `${mod} must not contain /execute-writes`);
+    }
+  });
+
+  it("candidate-detail.js contains allowed routes only", async () => {
+    const res = await fetch(`${BASE_URL}/candidate-detail.js`);
+    const text = await res.text();
+    assert.ok(text.includes("generate-write-plan"), "candidate-detail.js should reference generate-write-plan");
+    assert.ok(text.includes("run-dry-run"), "candidate-detail.js should reference run-dry-run");
+    assert.ok(text.includes("run-provider-agent-demo"), "candidate-detail.js should reference run-provider-agent-demo");
+    assert.ok(!text.includes("execute-writes"), "candidate-detail.js must not reference execute-writes");
+  });
+
+  it("UI modules and index.html include source hints for static-only sections", async () => {
+    const tasksRes = await fetch(`${BASE_URL}/operator-tasks.js`);
+    const tasksText = await tasksRes.text();
     const indexRes = await fetch(`${BASE_URL}/`);
     const indexText = await indexRes.text();
-    assert.ok(appText.includes("静态只读清单"), "app.js must include operator tasks source hint");
-    assert.ok(appText.includes("不来自运行快照"), "app.js must include snapshot exclusion hint");
+    assert.ok(tasksText.includes("静态只读清单"), "operator-tasks.js must include source hint");
+    assert.ok(tasksText.includes("不来自运行快照"), "operator-tasks.js must include snapshot exclusion hint");
     assert.ok(indexText.includes("本地安全报告，不来自运行快照"), "index.html must include console source hint");
   });
 
-  it("app.js has data_source display logic and does not hardcode 演示模式", async () => {
-    const res = await fetch(`${BASE_URL}/app.js`);
+  it("safety-badge.js has data_source display logic and does not hardcode 演示模式", async () => {
+    const res = await fetch(`${BASE_URL}/safety-badge.js`);
     const text = await res.text();
-    assert.ok(text.includes("updateModePill"), "app.js must include updateModePill function");
-    assert.ok(text.includes("updateFooterMeta"), "app.js must include updateFooterMeta function");
-    assert.ok(text.includes("data_source"), "app.js must reference data_source field");
-    assert.ok(text.includes("runtime_snapshot"), "app.js must reference runtime_snapshot mode");
-    assert.ok(text.includes("运行快照已脱敏"), "app.js must include runtime snapshot redaction label");
-    assert.ok(text.includes("演示样本已脱敏"), "app.js must include demo fixture redaction label");
+    assert.ok(text.includes("updateModePill"), "safety-badge.js must include updateModePill function");
+    assert.ok(text.includes("updateFooterMeta"), "safety-badge.js must include updateFooterMeta function");
+    assert.ok(text.includes("data_source"), "safety-badge.js must reference data_source field");
+    assert.ok(text.includes("runtime_snapshot"), "safety-badge.js must reference runtime_snapshot mode");
+    assert.ok(text.includes("运行快照已脱敏"), "safety-badge.js must include runtime snapshot redaction label");
+    assert.ok(text.includes("演示样本已脱敏"), "safety-badge.js must include demo fixture redaction label");
   });
 
-  it("app.js safety sub text is data-source aware, not hardcoded", async () => {
-    const res = await fetch(`${BASE_URL}/app.js`);
+  it("safety-badge.js safety sub text is data-source aware, not hardcoded", async () => {
+    const res = await fetch(`${BASE_URL}/safety-badge.js`);
     const text = await res.text();
     assert.ok(!text.includes("当前为只读演示模式"), "must not contain hardcoded demo safety sub text");
     assert.ok(text.includes("buildSafetySubText"), "must include buildSafetySubText helper");
@@ -783,12 +850,14 @@ describe("server API routes", () => {
     assert.ok(text.includes("当前展示演示样本"), "must include demo fixture safety text");
   });
 
-  it("app.js shows generated_at in footer for runtime snapshot", async () => {
-    const res = await fetch(`${BASE_URL}/app.js`);
-    const text = await res.text();
-    assert.ok(text.includes("generated_at"), "app.js must reference generated_at field");
-    assert.ok(text.includes("formatDateTime"), "app.js must use formatDateTime for generated_at display");
-    assert.ok(text.includes("生成 "), "app.js must include 生成 prefix for generated_at");
+  it("safety-badge.js shows generated_at in footer for runtime snapshot", async () => {
+    const sbRes = await fetch(`${BASE_URL}/safety-badge.js`);
+    const sbText = await sbRes.text();
+    const helperRes = await fetch(`${BASE_URL}/helpers.js`);
+    const helperText = await helperRes.text();
+    assert.ok(sbText.includes("generated_at"), "safety-badge.js must reference generated_at field");
+    assert.ok(helperText.includes("formatDateTime"), "helpers.js must include formatDateTime function");
+    assert.ok(sbText.includes("生成 "), "safety-badge.js must include 生成 prefix for generated_at");
   });
 
   it("index.html does not reference external fonts", async () => {
@@ -812,22 +881,25 @@ describe("server API routes", () => {
     assert.ok(!text.includes("googleapis"), "must not reference googleapis");
   });
 
-  it("app.js does not expose raw fetch error messages", async () => {
-    const res = await fetch(`${BASE_URL}/app.js`);
-    const text = await res.text();
-    assert.ok(!text.includes("returned "), "must not contain raw fetch status text like 'returned 404'");
-    assert.ok(!text.includes("GET /api"), "must not contain raw fetch path in error messages");
+  it("UI modules do not expose raw fetch error messages", async () => {
+    const modules = ["app.js", "helpers.js", "live-records.js", "candidate-detail.js"];
+    for (const mod of modules) {
+      const res = await fetch(`${BASE_URL}/${mod}`);
+      const text = await res.text();
+      assert.ok(!text.includes("returned "), `${mod} must not contain raw fetch status text`);
+      assert.ok(!text.includes("GET /api"), `${mod} must not contain raw fetch path in error messages`);
+    }
   });
 
   it("UI translates report status codes and provider summaries", async () => {
-    const appRes = await fetch(`${BASE_URL}/app.js`);
+    const constRes = await fetch(`${BASE_URL}/constants.js`);
+    const constText = await constRes.text();
     const cssRes = await fetch(`${BASE_URL}/style.css`);
-    const appText = await appRes.text();
     const cssText = await cssRes.text();
-    assert.ok(appText.includes('needs_review: "待复核"'), "needs_review should render as Chinese copy");
-    assert.ok(appText.includes('dry_run: "干跑"'), "dry_run should render as Chinese copy");
-    assert.ok(appText.includes('"Provider adapter is not enabled.": "模型供应商适配器未启用。"'));
-    assert.ok(appText.includes('"No commands to validate.": "暂无可验证命令。"'));
+    assert.ok(constText.includes('needs_review: "待复核"'), "needs_review should render as Chinese copy");
+    assert.ok(constText.includes('dry_run: "干跑"'), "dry_run should render as Chinese copy");
+    assert.ok(constText.includes('"Provider adapter is not enabled.": "模型供应商适配器未启用。"'));
+    assert.ok(constText.includes('"No commands to validate.": "暂无可验证命令。"'));
     assert.ok(cssText.includes(".check-icon.block"), "block check status should use failure styling");
   });
 

@@ -2018,3 +2018,326 @@ footer {
   opacity: 0.35;
   cursor: not-allowed;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   Phase 7.1 — Candidate Detail Panel
+   ═══════════════════════════════════════════════════════════════ */
+
+.candidate-detail-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 90;
+  opacity: 0;
+  transition: opacity 0.24s ease;
+  pointer-events: none;
+}
+.candidate-detail-backdrop-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.candidate-detail-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 480px;
+  max-width: 100vw;
+  height: 100dvh;
+  background: var(--c-surface);
+  border-left: 1px solid var(--c-border);
+  z-index: 100;
+  overflow-y: auto;
+  transform: translateX(100%);
+  transition: transform 0.24s ease;
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.12);
+}
+.candidate-detail-open {
+  transform: translateX(0);
+}
+
+.candidate-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--c-border);
+  position: sticky;
+  top: 0;
+  background: var(--c-surface);
+  z-index: 5;
+}
+.candidate-detail-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--c-text);
+}
+.candidate-detail-close {
+  border: none;
+  background: none;
+  font-size: 28px;
+  color: var(--c-text-muted);
+  cursor: pointer;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+}
+.candidate-detail-close:hover {
+  background: var(--c-bg-muted);
+  color: var(--c-text);
+}
+
+.candidate-detail-body {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ── Detail zone cards ── */
+
+.detail-zone {
+  border: 1px solid var(--c-border);
+  border-radius: 12px;
+  padding: 16px;
+  background: var(--c-bg);
+}
+.detail-zone-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--c-text);
+  margin-bottom: 6px;
+}
+.detail-zone-desc {
+  font-size: 12px;
+  color: var(--c-text-muted);
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+.detail-zone-loading {
+  font-size: 13px;
+  color: var(--c-text-muted);
+  padding: 8px 0;
+}
+.detail-zone-result {
+  margin-bottom: 12px;
+}
+
+.detail-result-ok {
+  font-size: 13px;
+  color: var(--c-success, #16a34a);
+  padding: 8px 0;
+}
+.detail-result-blocked {
+  font-size: 13px;
+  color: var(--c-warn, #d97706);
+  padding: 8px 0;
+}
+.detail-result-error {
+  font-size: 13px;
+  color: var(--c-error, #dc2626);
+  padding: 8px 0;
+}
+.detail-result-note {
+  font-size: 12px;
+  color: var(--c-text-muted);
+  margin-top: 4px;
+}
+
+/* ── Action buttons ── */
+
+.detail-action-btn {
+  padding: 10px 18px;
+  border-radius: 8px;
+  border: 1px solid var(--c-border);
+  background: var(--c-surface);
+  color: var(--c-text);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  min-height: 44px;
+  transition: background 0.15s, border-color 0.15s;
+}
+.detail-action-btn:hover:not(:disabled) {
+  background: var(--c-bg-muted);
+  border-color: var(--c-text-muted);
+}
+.detail-action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.detail-action-btn-warn {
+  border-color: var(--c-warn, #d97706);
+  color: var(--c-warn, #d97706);
+}
+
+/* ── Confirm input ── */
+
+.detail-confirm-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.detail-confirm-input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid var(--c-border);
+  border-radius: 8px;
+  font-size: 13px;
+  background: var(--c-bg);
+  color: var(--c-text);
+  min-height: 44px;
+}
+.detail-confirm-input::placeholder {
+  color: var(--c-text-muted);
+}
+
+/* ── Profile zone ── */
+
+.detail-profile-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.detail-profile-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.detail-field-label {
+  font-size: 11px;
+  color: var(--c-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.detail-field-value {
+  font-size: 13px;
+  color: var(--c-text);
+}
+
+/* ── Write plan result ── */
+
+.writeplan-metrics {
+  display: flex;
+  gap: 16px;
+  margin: 8px 0;
+}
+.writeplan-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.writeplan-metric-label {
+  font-size: 11px;
+  color: var(--c-text-muted);
+}
+.writeplan-metric-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--c-text);
+}
+.writeplan-nonce {
+  font-family: "SF Mono", "Cascadia Code", monospace;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.writeplan-blocked {
+  margin: 8px 0;
+  padding: 8px 12px;
+  background: rgba(217, 119, 6, 0.08);
+  border-radius: 8px;
+  border-left: 3px solid var(--c-warn, #d97706);
+}
+.writeplan-blocked-item {
+  font-size: 12px;
+  color: var(--c-warn, #d97706);
+  line-height: 1.6;
+}
+
+.writeplan-commands {
+  margin: 12px 0;
+}
+.writeplan-commands-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--c-text-muted);
+  margin-bottom: 6px;
+}
+.writeplan-cmd {
+  display: flex;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  margin-bottom: 4px;
+  font-size: 12px;
+  align-items: baseline;
+}
+.writeplan-cmd-action {
+  font-weight: 600;
+  color: var(--c-accent);
+  white-space: nowrap;
+  min-width: 80px;
+}
+.writeplan-cmd-table {
+  color: var(--c-text-muted);
+  white-space: nowrap;
+  min-width: 80px;
+}
+.writeplan-cmd-desc {
+  color: var(--c-text);
+  flex: 1;
+}
+
+.writeplan-summary {
+  font-size: 12px;
+  color: var(--c-text-muted);
+  margin-top: 8px;
+  line-height: 1.5;
+}
+
+/* ── Live record row clickable ── */
+
+.live-record-row {
+  cursor: pointer;
+}
+.live-record-row:hover {
+  background: var(--c-bg-muted);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Phase 7.1 — Responsive (375px breakpoint)
+   ═══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 480px) {
+  .candidate-detail-panel {
+    width: 100vw;
+    border-left: none;
+  }
+  .candidate-detail-body {
+    padding: 16px;
+  }
+  .candidate-detail-header {
+    padding: 16px;
+  }
+  .detail-profile-grid {
+    grid-template-columns: 1fr;
+  }
+  .detail-confirm-row {
+    flex-direction: column;
+  }
+  .writeplan-cmd {
+    flex-wrap: wrap;
+  }
+  .live-record-actions {
+    min-height: 44px;
+  }
+  .live-record-row {
+    min-height: 44px;
+    align-items: center;
+  }
+}
