@@ -236,6 +236,11 @@ export function parseRecordList(stdout: string | null): RecordListResult {
   const data = (typeof obj.data === "object" && obj.data !== null)
     ? obj.data as Record<string, unknown>
     : null;
+  const tabularRecords = parseTabularRecordList(data);
+  if (tabularRecords) {
+    return tabularRecords;
+  }
+
   const items = obj.items ?? data?.items;
   const totalValue = obj.total ?? data?.total;
   const hasMoreValue = obj.has_more ?? data?.has_more;
@@ -269,6 +274,54 @@ export function parseRecordList(stdout: string | null): RecordListResult {
       fields: fields as Record<string, unknown>,
     };
   });
+
+  return { records, total, hasMore };
+}
+
+function normalizeTabularFieldName(field: unknown): string | null {
+  if (typeof field === "string" && field.length > 0) return field;
+  if (typeof field !== "object" || field === null) return null;
+
+  const obj = field as Record<string, unknown>;
+  const name = obj.field_name ?? obj.name ?? obj.fieldName;
+  return typeof name === "string" && name.length > 0 ? name : null;
+}
+
+function getTabularCell(row: unknown, index: number): unknown {
+  if (Array.isArray(row)) return row[index];
+  if (typeof row === "object" && row !== null) {
+    return (row as Record<string, unknown>)[String(index)];
+  }
+  return undefined;
+}
+
+function parseTabularRecordList(data: Record<string, unknown> | null): RecordListResult | null {
+  if (!data) return null;
+  if (!Array.isArray(data.data) || !Array.isArray(data.fields) || !Array.isArray(data.record_id_list)) {
+    return null;
+  }
+
+  const fieldNames = data.fields.map(normalizeTabularFieldName);
+  const rows = data.data;
+  const recordIds = data.record_id_list;
+  const records = rows.map((row: unknown, rowIndex: number) => {
+    const recordId = recordIds[rowIndex];
+    if (typeof recordId !== "string") {
+      throw new OutputParseError(`Tabular record at index ${rowIndex} missing record_id_list entry`);
+    }
+
+    const fields: Record<string, unknown> = {};
+    fieldNames.forEach((fieldName, fieldIndex) => {
+      if (fieldName) fields[fieldName] = getTabularCell(row, fieldIndex);
+    });
+
+    return { id: recordId, fields };
+  });
+
+  const totalValue = data.total ?? rows.length;
+  const hasMoreValue = data.has_more;
+  const total = typeof totalValue === "number" ? totalValue : rows.length;
+  const hasMore = typeof hasMoreValue === "boolean" ? hasMoreValue : undefined;
 
   return { records, total, hasMore };
 }

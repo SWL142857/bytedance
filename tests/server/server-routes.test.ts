@@ -27,6 +27,8 @@ describe("server API routes", () => {
   afterEach(() => {
     return new Promise<void>((resolve) => {
       server.close(() => resolve());
+      server.closeIdleConnections?.();
+      server.closeAllConnections?.();
     });
   });
 

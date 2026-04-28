@@ -106,13 +106,13 @@ function buildConfigCheck(
     return {
       name: "Config",
       status: "fail",
-      summary: `Config missing ${configErrors.length} required field(s) for read-only resolution.`,
+      summary: `Config missing ${configErrors.length} required field(s) for live readiness.`,
     };
   }
   return {
     name: "Config",
     status: "pass",
-    summary: "Config is complete for read-only resolution.",
+    summary: "Config is complete for live readiness.",
   };
 }
 

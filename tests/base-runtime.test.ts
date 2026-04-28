@@ -541,6 +541,27 @@ describe("runner — output parsing", () => {
     assert.equal(result.hasMore, false);
   });
 
+  it("parseRecordList accepts lark-cli tabular data outputs", () => {
+    const stdout = JSON.stringify({
+      data: {
+        fields: ["ID", "title", "status"],
+        record_id_list: ["rec001", "rec002"],
+        data: [
+          ["1", "Engineer", "open"],
+          ["2", "Designer", "paused"],
+        ],
+        has_more: false,
+      },
+    });
+    const result = parseRecordList(stdout);
+    assert.equal(result.records.length, 2);
+    assert.equal(result.records[0]!.id, "rec001");
+    assert.equal(result.records[0]!.fields.title, "Engineer");
+    assert.equal(result.records[1]!.fields.status, "paused");
+    assert.equal(result.total, 2);
+    assert.equal(result.hasMore, false);
+  });
+
   it("parseRecordList throws on null stdout", () => {
     assert.throws(
       () => parseRecordList(null),
