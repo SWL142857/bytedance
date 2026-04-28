@@ -566,9 +566,9 @@ describe("runLiveAgentDataset (injectable)", () => {
       });
 
       const fakeConfig: HireLoopConfig = {
-        larkAppId: null, larkAppSecret: null, baseAppToken: null,
+        larkAppId: null, larkAppSecret: null, baseAppToken: null, feishuBaseWebUrl: null,
         modelApiKey: null, modelApiEndpoint: null, modelId: null,
-        modelProvider: "volcengine-ark", allowLarkWrite: true, debug: false,
+        modelProvider: "volcengine-ark", allowLarkRead: false, allowLarkWrite: true, debug: false,
       };
 
       const result = await runLiveAgentDataset({
@@ -604,9 +604,9 @@ describe("runLiveAgentDataset (injectable)", () => {
       });
 
       const fakeConfig: HireLoopConfig = {
-        larkAppId: null, larkAppSecret: null, baseAppToken: null,
+        larkAppId: null, larkAppSecret: null, baseAppToken: null, feishuBaseWebUrl: null,
         modelApiKey: null, modelApiEndpoint: null, modelId: null,
-        modelProvider: "volcengine-ark", allowLarkWrite: true, debug: false,
+        modelProvider: "volcengine-ark", allowLarkRead: false, allowLarkWrite: true, debug: false,
       };
 
       const result = await runLiveAgentDataset({
@@ -662,9 +662,9 @@ describe("runLiveAgentDataset (injectable)", () => {
       };
 
       const fakeConfig: HireLoopConfig = {
-        larkAppId: null, larkAppSecret: null, baseAppToken: null,
+        larkAppId: null, larkAppSecret: null, baseAppToken: null, feishuBaseWebUrl: null,
         modelApiKey: null, modelApiEndpoint: null, modelId: null,
-        modelProvider: "volcengine-ark", allowLarkWrite: true, debug: false,
+        modelProvider: "volcengine-ark", allowLarkRead: false, allowLarkWrite: true, debug: false,
       };
 
       const result = await runLiveAgentDataset({

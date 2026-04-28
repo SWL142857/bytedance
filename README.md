@@ -67,6 +67,7 @@ new → parsed → screened → interview_kit_ready → decision_pending → off
 | Phase 6.1a | 完成 | 本地真实 agent 输入驱动 + runtime snapshot：`pnpm pipeline:run` 可从外部 JSON 跑真实 4-agent pipeline，并让 UI 优先展示安全快照 |
 | Phase 6.4 | 完成 | Live dataset agent runner：`pnpm dataset:run` 支持 JSON array / JSONL 输入，默认 deterministic，provider execute 与 Base write 均受显式守卫且 fail-closed |
 | Phase 6.6 | 完成 | 真实 forbidden trace scanner 已接入 release gate、API boundary audit 和 server report；`pnpm scan:forbidden-traces` 当前 0 findings |
+| Phase 6.7 | 完成 | 飞书实时只读 + 安全跳转：`GET /api/live/base-status`、`GET /api/live/records?table=`、`/go/lnk_live_*` 302 到飞书 Base/对应表格页面；`HIRELOOP_ALLOW_LARK_READ=1` 独立只读开关；前端展示候选人/岗位实时数据与"打开飞书"按钮 |
 
 当前开发重点：
 
@@ -76,6 +77,9 @@ new → parsed → screened → interview_kit_ready → decision_pending → off
 | Phase 6.2 — 操作员控制台 | 类型与只读任务清单已就绪 | `src/types/operator-task.ts`、`src/server/operator-tasks-demo.ts` 与 `GET /api/operator/tasks` 已落地，仅返回安全的只读任务清单（每个任务 `execute_enabled=false`），尚未提供任何 execute / spawn 入口；真实执行需要后续阶段开放并经人工确认 |
 | Phase 6.3 — 数据伙伴接口契约 | 待定 | 与数据/RAG 侧对齐 `JobContext`、`CandidateProfile`、`RetrievedEvidence[]`、`AgentInputBundle` 等接口，先 mock 后替换 |
 | Phase 6.5 — Provider dataset execute verification | 本地待验收 | `pnpm provider:dataset-verify` 已接入本地脚本入口，范围仅 provider 模型执行验证 + 本地 runtime snapshot，不做 Base 写入；blocked 时不 fallback deterministic |
+| Phase 6.8 — 从前端点击运行 Agent Dry-run | 计划中 | `POST /api/live/candidates/:linkId/run-dry-run`，从 UI 选真实飞书候选人跑 deterministic pipeline，不写飞书 |
+| Phase 6.9 — Provider Agent Preview | 计划中 | 显式开启后对真实候选人跑 provider Agent preview，需确认短语，不写 Base |
+| Phase 7.0 — 人工确认写回飞书 | 计划中 | 两步写回：生成 write plan → 双确认执行，仅推进到 decision_pending，不做 offer/rejected |
 
 Phase 6.0 的最低验收边界（已完成）：
 
@@ -140,11 +144,11 @@ lark-cli `+record-upsert` 不支持按业务字段自动查重；没有 `--recor
 
 Record Resolution 层负责在真实 Base 执行前将应用侧 ID（`job_demo_*` / `cand_demo_*`）解析为 Lark record ID（`rec_xxx`），通过 `pnpm base:resolve:demo` 查看解析计划，`pnpm base:resolve:sample` 验证 sample parse 流程。Live-Ready MVP（resolution + pipeline + human decision + analytics）可通过 `pnpm mvp:live-ready` 一键验证。
 
-Read-Only Live Smoke（`pnpm base:resolve:readonly`）允许显式执行 `+record-list` 读取真实 Base 数据并解析 record ID，但不执行任何写命令（`+record-upsert`、`+table-create` 等）。执行要求：`--execute-readonly` 路径、完整飞书配置（`LARK_APP_ID`、`LARK_APP_SECRET`、`BASE_APP_TOKEN`）、`HIRELOOP_ALLOW_LARK_WRITE=1`。即使配置齐全，也只执行 `writesRemote === false` 的只读命令。
+Read-Only Live Smoke（`pnpm base:resolve:readonly`）允许显式执行 `+record-list` 读取真实 Base 数据并解析 record ID，但不执行任何写命令（`+record-upsert`、`+table-create` 等）。执行要求：`--execute-readonly` 路径、完整飞书配置（`LARK_APP_ID`、`LARK_APP_SECRET`、`BASE_APP_TOKEN`）、`HIRELOOP_ALLOW_LARK_READ=1`。即使配置齐全，也只执行 `writesRemote === false` 的只读命令。
 
 Live Write Plan Builder（`pnpm mvp:live-write-plan`）使用 sample resolution 构建完整 MVP 写入计划（pipeline + human decision + analytics），所有 link/status 字段使用 `rec_xxx`。默认不执行写入，仅输出命令列表。`pnpm mvp:live-write-plan:readonly` 先通过 read-only resolution 拿到真实 `rec_xxx`，再构建写入计划；如果 resolution blocked 或未解析到记录，则不生成写入计划。
 
-Guarded Live Write Runner（`pnpm mvp:live-write:dry-run`）对 Live Write Plan 做安全执行封装，dry-run 只输出 planned 结果，不打印 args、payload、stdout 或 token。真实写入只能通过 `pnpm mvp:live-write:execute` 触发，并且必须同时满足 read-only resolution 成功、`--execute`、确认短语 `EXECUTE_LIVE_MVP_WRITES`、完整飞书配置和 `HIRELOOP_ALLOW_LARK_WRITE=1`；否则返回 blocked/skipped，不执行写命令。
+Guarded Live Write Runner（`pnpm mvp:live-write:dry-run`）对 Live Write Plan 做安全执行封装，dry-run 只输出 planned 结果，不打印 args、payload、stdout 或 token。真实写入只能通过 `pnpm mvp:live-write:execute` 触发，并且必须同时满足 read-only resolution 成功（`HIRELOOP_ALLOW_LARK_READ=1`）、`--execute`、确认短语 `EXECUTE_LIVE_MVP_WRITES`、完整飞书配置和 `HIRELOOP_ALLOW_LARK_WRITE=1`；否则返回 blocked/skipped，不执行写命令。
 
 Live write runner 会输出 execution audit summary，记录 planned/skipped/success/failed 计数、失败停在第几条命令以及 recovery note。失败后不要盲目重跑整条链路，应先人工检查 Base 中已成功写入的前序记录，再决定补偿或定向重试。
 
@@ -192,6 +196,52 @@ API Boundary Release Audit（Phase 5.8，`pnpm mvp:api-boundary-audit`）审计 
 
 Forbidden Trace Scan（Phase 6.6，`pnpm scan:forbidden-traces`）扫描仓库内容中的泄露痕迹，而不是简单关键词禁用。它只 block 三类危险上下文：真实 secret marker、把 raw prompt/response/stdout/stderr/resumeText/payload 输出到日志、把 endpoint/modelId/apiKey 输出到日志。类型定义、配置对象、redaction 规则和测试断言中的普通字段名允许存在。CLI 只输出安全 JSON：`status`、`findingCount`、分类计数和文件列表，不输出匹配原文；release gate、API boundary audit 和 server report 只使用 pass/block 状态，不向 UI 暴露 findings 明细。
 
+### 飞书实时只读与安全跳转（Phase 6.7）
+
+**前置条件：** 配置飞书应用凭证并启用只读开关：
+
+```bash
+export LARK_APP_ID=<飞书应用 ID>
+export LARK_APP_SECRET=<飞书应用密钥>
+export BASE_APP_TOKEN=<Base 应用凭证>
+export HIRELOOP_ALLOW_LARK_READ=1      # 独立只读开关，不依赖写入开关
+
+# 可选：配置飞书 Base 页面地址以启用跳转
+export FEISHU_BASE_WEB_URL=<飞书 Base 页面 URL>
+# 或 export LARK_BASE_WEB_URL=<Lark Base 页面 URL>
+
+# 可选：配置表级页面 URL 后，Candidates / Jobs / Work Events 会跳转到对应表格
+export FEISHU_CANDIDATES_WEB_URL=<候选人表格页面 URL>
+export FEISHU_JOBS_WEB_URL=<岗位表格页面 URL>
+export FEISHU_WORK_EVENTS_WEB_URL=<Work Events 表格页面 URL>
+```
+
+**读写开关分离：**
+- `HIRELOOP_ALLOW_LARK_READ=1` — 允许只读访问飞书 Base（列出记录、查看数据）
+- `HIRELOOP_ALLOW_LARK_WRITE=1` — 允许写入飞书 Base（执行 upsert/update），需双重确认
+
+**API 端点：**
+- `GET /api/live/base-status` — 返回飞书连接状态（readEnabled、blockedReasons）
+- `GET /api/live/records?table=candidates` — 返回候选人安全列表（含 link、display_name、status、screening_recommendation、job_display、resume_available，不含 resume_text 原文和 record_id）
+- `GET /api/live/records?table=jobs` — 返回岗位安全列表（含 link、title、department、level、status、owner）
+- `GET /go/lnk_live_*` — 302 跳转到配置的飞书表格页面；优先使用 `FEISHU_CANDIDATES_WEB_URL` / `FEISHU_JOBS_WEB_URL` / `FEISHU_WORK_EVENTS_WEB_URL`，未配置时回退到 `FEISHU_BASE_WEB_URL` / `LARK_BASE_WEB_URL`；linkId 为 opaque UUID，不包含 recordId/table 信息
+
+**安全约束：**
+- 不配置时返回空数组和 blocked status，不抛 500
+- 原始 resume_text 不返回，最多返回 `resume_available: true/false`
+- record_id 仅在服务端内存 link registry 中存储，不暴露给前端
+- 响应不含 rec_、BASE_APP_TOKEN、table_id、payload、stdout、stderr、resumeText、apiKey、endpoint
+- link registry 有 TTL（24 小时）和上限（10,000 条）
+
+**前端展示：** 首页新增"飞书实时数据"区域：连接状态条 → 候选人列表 + 岗位列表（每条有"打开飞书"按钮）；未连接时显示中文原因和需配置项名称。
+
+**测试：** 无 env 时 `GET /api/live/base-status` 返回 `readEnabled=false` 和 blocked reasons，非 500；mock executor 下 `GET /api/live/records` 返回 safe projection；`/go/lnk_live_*` 在配置 Base URL 时返回 302。
+
+**下一步（计划中）：**
+- Phase 6.8：从前端选候选人，点击运行 Agent Dry-run（deterministic，不写飞书）
+- Phase 6.9：Provider Agent Preview（需确认短语，不写飞书）
+- Phase 7.0：两步写回飞书（生成 write plan → 双确认执行），仅推进状态，不做 offer/rejected
+
 ## 模型 API 本地配置
 
 真实模型凭证只能放在本地环境文件或部署平台的 secret manager 中，不能提交到 GitHub。推荐流程：
@@ -235,8 +285,8 @@ src/
   base/           — 飞书 Base 表结构常量定义（含 Work Events 表）
   llm/            — deterministic client、provider adapter/client 和 guarded provider runners
   runtime/        — 外部 JSON 输入装载与本地 agent 运行辅助
-  server/         — 安全本地 UI service layer、redaction 与 Work Events demo fixture
-  ui/             — 静态前端 shell（含组织运行总览与最近活动）
+  server/         — 安全本地 UI service layer、redaction、live base service 与 link registry
+  ui/             — 静态前端 shell（含组织运行总览、最近活动、飞书实时数据）
 tests/            — 纯逻辑测试
 ```
 
@@ -270,6 +320,15 @@ src/orchestrator/forbidden-trace-scan.ts         — context-based forbidden tra
 scripts/run-forbidden-trace-scan.ts              — scanner CLI，输出安全 JSON
 tests/orchestrator/forbidden-trace-scan.test.ts  — scanner 规则、allowlist、脱敏测试
 tests/scripts/forbidden-trace-scan.test.ts       — scanner CLI exit code 与输出安全测试
+```
+
+新增文件（Phase 6.7）：
+
+```text
+src/server/live-base.ts                       — 飞书实时只读 service：status check、record listing（候选人/岗位安全投影）
+src/server/live-link-registry.ts              — opaque link registry（内存 Map，24h TTL，10k 上限）
+tests/server/live-base.test.ts                — live base service 单元测试（mock executor）
+tests/server/live-link-registry.test.ts       — link registry 单元测试
 ```
 
 新增文件（Phase 6.5，本地待验收）：

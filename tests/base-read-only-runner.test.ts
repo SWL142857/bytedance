@@ -214,7 +214,7 @@ describe("runReadOnlyCommands — execute blocked", () => {
     assert.equal(result.results[0]!.status, "skipped");
   });
 
-  it("blocked when allowLarkWrite is false", () => {
+  it("blocked when allowLarkRead is false", () => {
     const result = runReadOnlyCommands({
       commands: [listRecords("jobs")],
       config: loadConfig({
@@ -272,7 +272,7 @@ describe("runReadOnlyCommands — custom executor", () => {
         LARK_APP_ID: "fake",
         LARK_APP_SECRET: "fake",
         BASE_APP_TOKEN: "fake",
-        HIRELOOP_ALLOW_LARK_WRITE: "1",
+        HIRELOOP_ALLOW_LARK_READ: "1",
       }),
       execute: true,
       executor: fakeExecutor,
@@ -302,7 +302,7 @@ describe("runReadOnlyCommands — custom executor", () => {
         LARK_APP_ID: "fake",
         LARK_APP_SECRET: "fake",
         BASE_APP_TOKEN: "fake",
-        HIRELOOP_ALLOW_LARK_WRITE: "1",
+        HIRELOOP_ALLOW_LARK_READ: "1",
       }),
       execute: true,
       executor: failExecutor,
@@ -329,7 +329,7 @@ describe("runReadOnlyCommands — custom executor", () => {
         LARK_APP_ID: "fake",
         LARK_APP_SECRET: "fake",
         BASE_APP_TOKEN: token,
-        HIRELOOP_ALLOW_LARK_WRITE: "1",
+        HIRELOOP_ALLOW_LARK_READ: "1",
       }),
       execute: true,
       executor: failExecutor,

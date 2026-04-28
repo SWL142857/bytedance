@@ -61,7 +61,7 @@ function makeConfig(): ReturnType<typeof loadConfig> {
     LARK_APP_ID: "fake",
     LARK_APP_SECRET: "fake",
     BASE_APP_TOKEN: "fake",
-    HIRELOOP_ALLOW_LARK_WRITE: "1",
+    HIRELOOP_ALLOW_LARK_READ: "1",
   });
 }
 
@@ -93,7 +93,7 @@ describe("runRecordResolutionPlan — execute blocked", () => {
     assert.equal(result.resolvedRecords.length, 0);
   });
 
-  it("returns resolvedRecords=[] when allowLarkWrite is not set", () => {
+  it("returns resolvedRecords=[] when allowLarkRead is not set", () => {
     const result = runRecordResolutionPlan({
       identities: [JOB_IDENTITY],
       config: loadConfig({

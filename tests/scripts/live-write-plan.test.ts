@@ -95,7 +95,7 @@ describe("live write plan — readonly blocked fails closed", () => {
     assert.ok(result.resolvedRecords.length === 0, "Must fail closed: no resolved records when blocked");
   });
 
-  it("does not generate write plan when allowLarkWrite is missing", () => {
+  it("does not generate write plan when allowLarkRead is missing", () => {
     const result = runRecordResolutionPlan({
       identities: [MVP_JOB_IDENTITY, MVP_CANDIDATE_IDENTITY],
       config: loadConfig({

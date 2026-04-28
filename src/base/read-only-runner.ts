@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import type { BaseCommandSpec } from "./commands.js";
 import { injectBaseToken } from "./commands.js";
 import type { HireLoopConfig } from "../config.js";
-import { validateExecutionConfig, redactConfig } from "../config.js";
+import { validateReadOnlyConfig, redactConfig } from "../config.js";
 import type { CommandResult, RunMode } from "./lark-cli-runner.js";
 
 export type { CommandResult };
@@ -167,7 +167,7 @@ export function runReadOnlyCommands(
     return { mode, results, blocked: false };
   }
 
-  const configErrors = validateExecutionConfig(config);
+  const configErrors = validateReadOnlyConfig(config);
   if (configErrors.length > 0) {
     console.error("Read-only execution blocked due to invalid config:");
     for (const err of configErrors) {
@@ -185,8 +185,8 @@ export function runReadOnlyCommands(
     return { mode, results, blocked: true };
   }
 
-  if (!config.allowLarkWrite) {
-    console.error("Read-only execution blocked: HIRELOOP_ALLOW_LARK_WRITE is not set to 1");
+  if (!config.allowLarkRead) {
+    console.error("Read-only execution blocked: HIRELOOP_ALLOW_LARK_READ is not set to 1");
     console.error("Redacted config:", JSON.stringify(redactConfig(config), null, 2));
     const results: CommandResult[] = commands.map((cmd) => ({
       description: cmd.description,

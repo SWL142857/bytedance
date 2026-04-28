@@ -12,6 +12,8 @@ import { buildProviderAgentDemoPlan } from "../llm/provider-agent-demo-runner.js
 import { buildPreApiFreezeReport } from "../orchestrator/pre-api-freeze-report.js";
 import { buildLiveReadinessReport } from "../orchestrator/live-readiness-report.js";
 import { loadConfig } from "../config.js";
+import { getLiveBaseStatus, listLiveRecords } from "./live-base.js";
+import { getLiveLinkRegistry } from "./live-link-registry.js";
 import { buildDemoWorkEvents } from "./work-events-demo.js";
 import { buildOperatorTasksOverview } from "./operator-tasks-demo.js";
 import {
@@ -42,6 +44,7 @@ const CONTENT_TYPES: Record<string, string> = {
 
 const UI_DIR = resolve(import.meta.dirname, "..", "ui");
 const PORT = 3000;
+const LIVE_TABLES = new Set(["candidates", "jobs", "work_events"]);
 
 export interface UiServerOptions {
   beforeApiRoute?: (pathname: string) => void;
@@ -186,6 +189,25 @@ function determineAgentStatus(event: OrgOverviewView["recent_events"][number] | 
   return "工作中";
 }
 
+function resolveLiveFeishuUrl(table: string): string | null {
+  const config = loadConfig();
+  const tableUrl = LIVE_TABLES.has(table)
+    ? config.feishuTableWebUrls?.[table as "candidates" | "jobs" | "work_events"] ?? null
+    : null;
+  return safeRedirectUrl(tableUrl ?? config.feishuBaseWebUrl);
+}
+
+function safeRedirectUrl(rawUrl: string | null): string | null {
+  if (!rawUrl) return null;
+  try {
+    const url = new URL(rawUrl);
+    if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
 async function handleApi(
   req: http.IncomingMessage,
   res: http.ServerResponse,
@@ -245,6 +267,20 @@ async function handleApi(
 
     if (url.pathname === "/api/operator/tasks" && req.method === "GET") {
       jsonResponse(res, buildOperatorTasksOverview());
+      return;
+    }
+
+    // ── Live Base routes (Phase 6.7) ──
+
+    if (url.pathname === "/api/live/base-status" && req.method === "GET") {
+      jsonResponse(res, getLiveBaseStatus());
+      return;
+    }
+
+    if (url.pathname === "/api/live/records" && req.method === "GET") {
+      const table = url.searchParams.get("table") ?? "";
+      const result = await listLiveRecords(table);
+      jsonResponse(res, result);
       return;
     }
 
@@ -378,16 +414,41 @@ function handleGo(req: http.IncomingMessage, res: http.ServerResponse): void {
   const url = new URL(req.url ?? "/", `http://localhost:${PORT}`);
   const linkId = decodeURIComponent(url.pathname.slice(4));
 
-  if (!/^lnk_demo_\d{3}$/.test(linkId)) {
-    errorResponse(res, 404, "未找到可用的演示跳转");
+  // Demo links — same behavior as before
+  if (/^lnk_demo_\d{3}$/.test(linkId)) {
+    jsonResponse(res, {
+      mode: "demo",
+      available: false,
+      message: "当前为演示模式，Live 模式下将跳转到飞书对应页面。",
+    });
     return;
   }
 
-  jsonResponse(res, {
-    mode: "demo",
-    available: false,
-    message: "当前为演示模式，Live 模式下将跳转到飞书对应页面。",
-  });
+  // Live links — redirect to Feishu Base
+  if (linkId.startsWith("lnk_live_")) {
+    const entry = getLiveLinkRegistry().resolve(linkId);
+    if (!entry) {
+      errorResponse(res, 404, "未找到对应的飞书记录链接");
+      return;
+    }
+
+    const baseUrl = resolveLiveFeishuUrl(entry.table);
+    if (baseUrl) {
+      res.writeHead(302, { Location: baseUrl });
+      res.end();
+      return;
+    }
+
+    // Base URL not configured — return safe message
+    jsonResponse(res, {
+      mode: "live",
+      available: false,
+      message: "已连接飞书，当前跳转到对应 Base 页面；记录级跳转待配置。",
+    });
+    return;
+  }
+
+  errorResponse(res, 404, "未找到可用的演示跳转");
 }
 
 export function createServer(options: UiServerOptions = {}): http.Server {

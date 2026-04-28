@@ -95,6 +95,132 @@ describe("server API routes", () => {
     }
   });
 
+  // ── Phase 6.7: Live routes ──
+
+  it("GET /api/live/base-status returns safe status (not 500)", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/base-status`);
+    assert.ok(res.ok);
+    const data = await res.json() as Record<string, unknown>;
+    assert.equal(typeof data.readEnabled, "boolean");
+    assert.equal(typeof data.writeDisabled, "boolean");
+    assert.ok(Array.isArray(data.blockedReasons));
+    // Without env, should show blocked but not crash
+    assert.equal(data.readEnabled, false);
+  });
+
+  it("GET /api/live/records without table returns empty", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/records`);
+    assert.ok(res.ok);
+    const data = await res.json() as Record<string, unknown>;
+    assert.ok(Array.isArray(data.records));
+    assert.equal(data.total, 0);
+  });
+
+  it("GET /api/live/records?table=candidates returns empty without env", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/records?table=candidates`);
+    assert.ok(res.ok);
+    const data = await res.json() as Record<string, unknown>;
+    assert.ok(Array.isArray(data.records));
+  });
+
+  it("live API responses do not leak rec_ or sensitive fields", async () => {
+    const paths = ["/api/live/base-status", "/api/live/records?table=candidates", "/api/live/records?table=jobs"];
+    for (const path of paths) {
+      const res = await fetch(`${BASE_URL}${path}`);
+      const text = await res.text();
+      assert.ok(!text.includes("rec_"), `${path} must not contain rec_`);
+      assert.ok(!text.includes("table_id"), `${path} must not contain table_id`);
+      assert.ok(!text.includes("payload"), `${path} must not contain payload`);
+      assert.ok(!text.includes("stdout"), `${path} must not contain stdout`);
+      assert.ok(!text.includes("stderr"), `${path} must not contain stderr`);
+      assert.ok(!text.includes("resumeText"), `${path} must not contain resumeText`);
+      assert.ok(!text.includes("apiKey"), `${path} must not contain apiKey`);
+      assert.ok(!text.includes("endpoint"), `${path} must not contain endpoint`);
+      assert.ok(!text.includes("modelId"), `${path} must not contain modelId`);
+    }
+  });
+
+  it("GET /api/live/base-status via non-GET returns 404", async () => {
+    for (const method of ["POST", "PUT", "DELETE"]) {
+      const res = await fetch(`${BASE_URL}/api/live/base-status`, { method });
+      assert.equal(res.status, 404);
+    }
+  });
+
+  it("GET /go/lnk_live_* returns 302 with FEISHU_BASE_WEB_URL configured", async () => {
+    const prev = process.env.FEISHU_BASE_WEB_URL;
+    const prevCandidates = process.env.FEISHU_CANDIDATES_WEB_URL;
+    const prevJobs = process.env.FEISHU_JOBS_WEB_URL;
+    const prevEvents = process.env.FEISHU_WORK_EVENTS_WEB_URL;
+    process.env.FEISHU_BASE_WEB_URL = "https://example.feishu.cn/base/xxx";
+    delete process.env.FEISHU_CANDIDATES_WEB_URL;
+    delete process.env.FEISHU_JOBS_WEB_URL;
+    delete process.env.FEISHU_WORK_EVENTS_WEB_URL;
+    try {
+      // Create a new server so it picks up the env
+      const { createServer } = await import("../../src/server/server.js");
+      const srv = createServer();
+      await new Promise<void>((resolve) => { srv.listen(0, () => resolve()); });
+      try {
+        const addr = srv.address();
+        assert.ok(addr && typeof addr === "object");
+        // First register a link via the API
+        const { getLiveLinkRegistry } = await import("../../src/server/live-link-registry.js");
+        const linkId = getLiveLinkRegistry().register("candidates", "rec_test_001");
+        const res = await fetch(`http://localhost:${addr.port}/go/${linkId}`, { redirect: "manual" });
+        assert.equal(res.status, 302);
+        assert.ok(res.headers.get("location")?.includes("example.feishu.cn"));
+      } finally {
+        await new Promise<void>((resolve) => { srv.close(() => resolve()); });
+      }
+    } finally {
+      if (prev === undefined) delete process.env.FEISHU_BASE_WEB_URL;
+      else process.env.FEISHU_BASE_WEB_URL = prev;
+      if (prevCandidates === undefined) delete process.env.FEISHU_CANDIDATES_WEB_URL;
+      else process.env.FEISHU_CANDIDATES_WEB_URL = prevCandidates;
+      if (prevJobs === undefined) delete process.env.FEISHU_JOBS_WEB_URL;
+      else process.env.FEISHU_JOBS_WEB_URL = prevJobs;
+      if (prevEvents === undefined) delete process.env.FEISHU_WORK_EVENTS_WEB_URL;
+      else process.env.FEISHU_WORK_EVENTS_WEB_URL = prevEvents;
+    }
+  });
+
+  it("GET /go/lnk_live_* prefers the matching Feishu table URL when configured", async () => {
+    const prevBase = process.env.FEISHU_BASE_WEB_URL;
+    const prevCandidates = process.env.FEISHU_CANDIDATES_WEB_URL;
+    const prevJobs = process.env.FEISHU_JOBS_WEB_URL;
+    try {
+      process.env.FEISHU_BASE_WEB_URL = "https://example.feishu.cn/base/main";
+      process.env.FEISHU_CANDIDATES_WEB_URL = "https://example.feishu.cn/base/candidates";
+      process.env.FEISHU_JOBS_WEB_URL = "https://example.feishu.cn/base/jobs";
+      const { createServer } = await import("../../src/server/server.js");
+      const srv = createServer();
+      await new Promise<void>((resolve) => { srv.listen(0, () => resolve()); });
+      try {
+        const addr = srv.address();
+        assert.ok(addr && typeof addr === "object");
+        const { getLiveLinkRegistry } = await import("../../src/server/live-link-registry.js");
+        const candidateLinkId = getLiveLinkRegistry().register("candidates", "rec_test_candidate");
+        const jobLinkId = getLiveLinkRegistry().register("jobs", "rec_test_job");
+        const candidateRes = await fetch(`http://localhost:${addr.port}/go/${candidateLinkId}`, { redirect: "manual" });
+        const jobRes = await fetch(`http://localhost:${addr.port}/go/${jobLinkId}`, { redirect: "manual" });
+        assert.equal(candidateRes.status, 302);
+        assert.equal(jobRes.status, 302);
+        assert.equal(candidateRes.headers.get("location"), "https://example.feishu.cn/base/candidates");
+        assert.equal(jobRes.headers.get("location"), "https://example.feishu.cn/base/jobs");
+      } finally {
+        await new Promise<void>((resolve) => { srv.close(() => resolve()); });
+      }
+    } finally {
+      if (prevBase === undefined) delete process.env.FEISHU_BASE_WEB_URL;
+      else process.env.FEISHU_BASE_WEB_URL = prevBase;
+      if (prevCandidates === undefined) delete process.env.FEISHU_CANDIDATES_WEB_URL;
+      else process.env.FEISHU_CANDIDATES_WEB_URL = prevCandidates;
+      if (prevJobs === undefined) delete process.env.FEISHU_JOBS_WEB_URL;
+      else process.env.FEISHU_JOBS_WEB_URL = prevJobs;
+    }
+  });
+
   it("GET /api/reports/provider-readiness returns provider readiness", async () => {
     const data = await fetchJson("/api/reports/provider-readiness");
     assert.equal(data.status, "disabled");
@@ -301,6 +427,16 @@ describe("server API routes", () => {
     assert.ok(!text.includes("feishu.cn"), "app.js must not reference real feishu.cn URLs");
     assert.ok(!text.includes("larksuite.com"), "app.js must not reference real larksuite URLs");
     assert.ok(!text.includes("base_app_token"), "app.js must not contain base_app_token");
+  });
+
+  it("app.js live Feishu buttons open /go route directly for browser redirects", async () => {
+    const appRes = await fetch(`${BASE_URL}/app.js`);
+    const appText = await appRes.text();
+    const indexRes = await fetch(`${BASE_URL}/`);
+    const indexText = await indexRes.text();
+    assert.ok(appText.includes("window._hireloopOpenFeishu"), "app.js must expose live open helper");
+    assert.ok(appText.includes('window.open("/go/" + encodeURIComponent(linkId)'), "live links must use browser navigation, not fetch redirects");
+    assert.ok(indexText.includes("飞书实时数据"), "index.html must render live Feishu data section");
   });
 
   it("app.js does not encourage live execute write actions", async () => {

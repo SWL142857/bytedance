@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { loadConfig, validateExecutionConfig, redactConfig } from "../src/config.js";
+import { loadConfig, validateExecutionConfig, validateReadOnlyConfig, redactConfig } from "../src/config.js";
 import type { HireLoopConfig } from "../src/config.js";
 
 describe("config — dry-run does not require secrets", () => {
@@ -44,9 +44,52 @@ describe("config — dry-run does not require secrets", () => {
     assert.equal(config.allowLarkWrite, true);
   });
 
+  it("loads config with allowLarkRead=1", () => {
+    const config = loadConfig({ HIRELOOP_ALLOW_LARK_READ: "1" });
+    assert.equal(config.allowLarkRead, true);
+    assert.equal(config.allowLarkWrite, false);
+  });
+
+  it("loads optional table-specific Feishu web URLs", () => {
+    const config = loadConfig({
+      FEISHU_BASE_WEB_URL: "https://example.feishu.cn/base/main",
+      FEISHU_CANDIDATES_WEB_URL: "https://example.feishu.cn/base/candidates",
+      FEISHU_JOBS_WEB_URL: "https://example.feishu.cn/base/jobs",
+      FEISHU_WORK_EVENTS_WEB_URL: "https://example.feishu.cn/base/work-events",
+    });
+    assert.equal(config.feishuBaseWebUrl, "https://example.feishu.cn/base/main");
+    assert.equal(config.feishuTableWebUrls?.candidates, "https://example.feishu.cn/base/candidates");
+    assert.equal(config.feishuTableWebUrls?.jobs, "https://example.feishu.cn/base/jobs");
+    assert.equal(config.feishuTableWebUrls?.work_events, "https://example.feishu.cn/base/work-events");
+  });
+
   it("allowLarkWrite is false for any non-1 value", () => {
     const config = loadConfig({ HIRELOOP_ALLOW_LARK_WRITE: "yes" });
     assert.equal(config.allowLarkWrite, false);
+  });
+});
+
+describe("config — read-only mode validation", () => {
+  it("fails when read-only flag is missing even if write flag is set", () => {
+    const config = loadConfig({
+      LARK_APP_ID: "test_id",
+      LARK_APP_SECRET: "test_secret",
+      BASE_APP_TOKEN: "test_token",
+      HIRELOOP_ALLOW_LARK_WRITE: "1",
+    });
+    const errors = validateReadOnlyConfig(config);
+    assert.equal(errors.length, 1);
+    assert.equal(errors[0]!.field, "HIRELOOP_ALLOW_LARK_READ");
+  });
+
+  it("passes when credentials and allowLarkRead are present", () => {
+    const config = loadConfig({
+      LARK_APP_ID: "test_id",
+      LARK_APP_SECRET: "test_secret",
+      BASE_APP_TOKEN: "test_token",
+      HIRELOOP_ALLOW_LARK_READ: "1",
+    });
+    assert.deepEqual(validateReadOnlyConfig(config), []);
   });
 });
 
@@ -102,10 +145,12 @@ describe("config — redactConfig does not leak secrets", () => {
     larkAppId: "app_id_12345",
     larkAppSecret: "secret_abcdef",
     baseAppToken: "token_xyz789",
+    feishuBaseWebUrl: null,
     modelApiKey: "sk-abc123def456",
     modelApiEndpoint: "https://api.example.com/v1",
     modelId: "model-or-endpoint-id",
     modelProvider: "volcengine-ark",
+    allowLarkRead: false,
     allowLarkWrite: true,
     debug: false,
   };
@@ -162,10 +207,12 @@ describe("config — redactConfig does not leak secrets", () => {
       larkAppId: null,
       larkAppSecret: null,
       baseAppToken: null,
+      feishuBaseWebUrl: null,
       modelApiKey: null,
       modelApiEndpoint: null,
       modelId: null,
       modelProvider: "volcengine-ark",
+      allowLarkRead: false,
       allowLarkWrite: false,
       debug: false,
     };

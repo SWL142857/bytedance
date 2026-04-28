@@ -87,10 +87,12 @@ function fakeReadyConfig(): HireLoopConfig {
     larkAppId: null,
     larkAppSecret: null,
     baseAppToken: null,
+    feishuBaseWebUrl: null,
     modelApiKey: "sk-present",
     modelApiEndpoint: "https://example.com/v1",
     modelId: "test-model",
     modelProvider: "volcengine-ark",
+    allowLarkRead: false,
     allowLarkWrite: false,
     debug: false,
   };
@@ -129,9 +131,9 @@ describe("runProviderDatasetVerify (injectable)", () => {
       confirm: VALID_CONFIRM,
       deps: {
         loadConfig: () => ({
-          larkAppId: null, larkAppSecret: null, baseAppToken: null,
+          larkAppId: null, larkAppSecret: null, baseAppToken: null, feishuBaseWebUrl: null,
           modelApiKey: null, modelApiEndpoint: null, modelId: null,
-          modelProvider: "volcengine-ark", allowLarkWrite: false, debug: false,
+          modelProvider: "volcengine-ark", allowLarkRead: false, allowLarkWrite: false, debug: false,
         }),
       },
     });
@@ -177,9 +179,9 @@ describe("runProviderDatasetVerify (injectable)", () => {
       confirm: VALID_CONFIRM,
       deps: {
         loadConfig: () => ({
-          larkAppId: null, larkAppSecret: null, baseAppToken: null,
+          larkAppId: null, larkAppSecret: null, baseAppToken: null, feishuBaseWebUrl: null,
           modelApiKey: null, modelApiEndpoint: null, modelId: null,
-          modelProvider: "volcengine-ark", allowLarkWrite: false, debug: false,
+          modelProvider: "volcengine-ark", allowLarkRead: false, allowLarkWrite: false, debug: false,
         }),
         runLiveAgentDataset: async () => { called = true; return mockRunnerResult(); },
       },

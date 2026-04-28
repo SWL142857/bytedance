@@ -1237,11 +1237,149 @@
     };
   }
 
+  // ── Live Feishu Data (Phase 6.7) ──────────────────────────
+
+  function renderLiveBaseStatus(data) {
+    var el = document.getElementById("live-base-status");
+    if (!el) return;
+    var hint = document.getElementById("live-data-hint");
+
+    if (data && data.readEnabled && data.blockedReasons && data.blockedReasons.length === 0) {
+      el.innerHTML =
+        '<div class="live-status-ok">' +
+        '<span class="live-status-icon ok">&#10003;</span>' +
+        '<span class="live-status-text"><strong>飞书已连接</strong> &middot; 实时只读模式，所有写入已禁用</span>' +
+        "</div>";
+      if (hint) hint.textContent = "飞书 Base 实时数据 · 只读模式";
+    } else {
+      var reasons = (data && data.blockedReasons) ? data.blockedReasons : ["飞书连接未配置"];
+      var reasonItems = reasons.map(function (r) { return "<li>" + esc(r) + "</li>"; }).join("");
+      el.innerHTML =
+        '<div class="live-status-blocked">' +
+        '<div style="display:flex;align-items:center;gap:10px">' +
+        '<span class="live-status-icon blocked">&#10007;</span>' +
+        '<span class="live-status-text"><strong>飞书未连接</strong> &middot; 只读未启用</span>' +
+        "</div>" +
+        '<ul class="live-status-reasons">' + reasonItems + "</ul>" +
+        "</div>";
+      if (hint) hint.textContent = "请配置 LARK_APP_ID / LARK_APP_SECRET / BASE_APP_TOKEN 并设置 HIRELOOP_ALLOW_LARK_READ=1";
+    }
+  }
+
+  function renderLiveRecords(containerId, records, title, colName, colMeta, colExtra) {
+    var el = document.getElementById(containerId);
+    if (!el) return;
+    if (!records || records.length === 0) {
+      el.innerHTML = '<div class="live-card-empty">暂无数据</div>';
+      return;
+    }
+    var head =
+      '<div class="live-card-head">' +
+      '<span class="live-card-head-title">' + esc(title) + "</span>" +
+      '<span class="live-card-head-count">' + esc(String(records.length)) + "</span>" +
+      "</div>";
+    var rows = "";
+    for (var i = 0; i < records.length; i++) {
+      var r = records[i];
+      var name = esc(String(r[colName] || ""));
+      var meta = (colMeta || []).map(function (k) {
+        var v = r[k];
+        if (v === null || v === undefined || v === "") return "";
+        return '<span class="live-record-meta-item">' + esc(String(v)) + "</span>";
+      }).filter(Boolean).join(" &middot; ");
+      var extra = colExtra ? colExtra(r) : "";
+      var btn = "";
+      if (r.link && r.link.available && r.link.link_id) {
+        btn =
+          '<button type="button" class="live-open-btn" data-link-id="' +
+          esc(String(r.link.link_id)) +
+          '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg> 打开飞书</button>';
+      }
+      rows +=
+        '<div class="live-record-row">' +
+        '<div class="live-record-info">' +
+        '<span class="live-record-name">' + name + "</span>" +
+        '<span class="live-record-meta">' + meta + extra + "</span>" +
+        "</div>" +
+        btn +
+        "</div>";
+    }
+    el.innerHTML =
+      '<div class="live-card-panel">' + head + '<div class="live-card-body">' + rows + "</div></div>";
+
+    var buttons = el.querySelectorAll(".live-open-btn");
+    for (var b = 0; b < buttons.length; b++) {
+      buttons[b].addEventListener("click", function (ev) {
+        var linkId = ev.currentTarget.getAttribute("data-link-id");
+        window._hireloopOpenFeishu(linkId);
+      });
+    }
+  }
+
+  function loadLiveData() {
+    fetchJson("/api/live/base-status")
+      .then(function (status) {
+        renderLiveBaseStatus(status);
+        if (status && status.readEnabled && status.blockedReasons && status.blockedReasons.length === 0) {
+          Promise.all([
+            fetchJson("/api/live/records?table=candidates"),
+            fetchJson("/api/live/records?table=jobs"),
+          ]).then(function (results) {
+            var candData = results[0];
+            var jobData = results[1];
+            renderLiveRecords(
+              "live-candidates",
+              (candData && candData.records) || [],
+              "候选人",
+              "display_name",
+              ["status", "job_display"],
+              function (r) {
+                var tags = "";
+                if (r.resume_available) tags += '<span class="live-record-tag resume">有简历</span>';
+                if (r.screening_recommendation) tags += '<span class="live-record-tag">' + esc(r.screening_recommendation) + "</span>";
+                return tags;
+              },
+            );
+            renderLiveRecords(
+              "live-jobs",
+              (jobData && jobData.records) || [],
+              "岗位",
+              "title",
+              ["department", "level", "status", "owner"],
+              null,
+            );
+          }).catch(function () {
+            var grid = document.getElementById("live-grid");
+            if (grid) grid.innerHTML = errorHtml();
+          });
+        } else {
+          var grid = document.getElementById("live-grid");
+          if (grid) grid.innerHTML =
+            '<div class="live-card-empty" style="grid-column:1/-1">飞书连接未就绪，实时数据暂不可用</div>';
+        }
+      })
+      .catch(function () {
+        renderLiveBaseStatus(null);
+        var grid = document.getElementById("live-grid");
+        if (grid) grid.innerHTML =
+          '<div class="live-card-empty" style="grid-column:1/-1">飞书连接未就绪，实时数据暂不可用</div>';
+      });
+  }
+
+  // Expose open-feishu for onclick
+  window._hireloopOpenFeishu = function (linkId) {
+    if (!linkId) return;
+    window.open("/go/" + encodeURIComponent(linkId), "_blank", "noopener");
+  };
+
   function load() {
     mountIntroOverlay();
     mountDrawer();
     setHeaderTime();
     setInterval(setHeaderTime, 30000);
+
+    // Live data fetch (fire-and-forget, non-blocking)
+    loadLiveData();
 
     Promise.all([
       fetchJson("/api/org/overview"),
