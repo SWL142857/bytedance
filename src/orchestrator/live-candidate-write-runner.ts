@@ -2,16 +2,11 @@ import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { DeterministicLlmClient } from "../llm/deterministic-client.js";
 import { runCandidatePipeline, type CandidatePipelineInput } from "./candidate-pipeline.js";
-import { getLiveLinkRegistry } from "../server/live-link-registry.js";
-import { getLiveBaseStatus } from "../server/live-base.js";
-import { buildListRecordsCommand } from "../base/queries.js";
-import { runReadOnlyCommands, type CommandExecutor } from "../base/read-only-runner.js";
-import { parseRecordList } from "../base/lark-cli-runner.js";
 import { injectBaseToken, type BaseCommandSpec } from "../base/commands.js";
 import { ALL_TABLES } from "../base/schema.js";
-import type { HireLoopConfig } from "../config.js";
 import { loadConfig, validateExecutionConfig, redactConfig } from "../config.js";
 import type { CandidateStatus } from "../types/state.js";
+import { readLiveCandidateContext } from "./live-candidate-context.js";
 
 // ── Types ──
 
@@ -42,11 +37,8 @@ export interface SafeLiveCandidateWriteResult {
   safeSummary: string;
 }
 
-export interface LiveCandidateWriteRunnerDeps {
-  loadConfig?: () => HireLoopConfig;
-  executor?: CommandExecutor;
-  cliAvailable?: () => boolean;
-}
+import type { LiveCandidateDeps } from "./live-candidate-context.js";
+export type LiveCandidateWriteRunnerDeps = LiveCandidateDeps;
 
 export interface ExecuteLiveCandidateWritesOptions {
   confirm: string;
@@ -188,42 +180,6 @@ function buildBlockedResult(
   };
 }
 
-function quietConsole<T>(fn: () => T): T {
-  const originalError = console.error;
-  const originalLog = console.log;
-  console.error = () => {};
-  console.log = () => {};
-  try {
-    return fn();
-  } finally {
-    console.error = originalError;
-    console.log = originalLog;
-  }
-}
-
-function extractTextField(fields: Record<string, unknown>, fieldName: string): string | null {
-  const val = fields[fieldName];
-  if (typeof val === "string" && val.length > 0) return val;
-  if (Array.isArray(val) && val.length > 0) {
-    const first = val[0];
-    if (typeof first === "string") return first;
-    if (typeof first === "object" && first !== null) {
-      const obj = first as Record<string, unknown>;
-      return typeof obj.text === "string" ? obj.text : null;
-    }
-  }
-  return null;
-}
-
-function extractLinkRecordId(fields: Record<string, unknown>, fieldName: string): string | null {
-  const val = fields[fieldName];
-  if (!Array.isArray(val) || val.length === 0) return null;
-  const first = val[0];
-  if (typeof first !== "object" || first === null) return null;
-  const obj = first as Record<string, unknown>;
-  return typeof obj.id === "string" && obj.id.startsWith("rec") ? obj.id : null;
-}
-
 // ── Shared: read candidate + job from Feishu, run pipeline ──
 
 async function runPipelineForCandidate(
@@ -233,122 +189,26 @@ async function runPipelineForCandidate(
   | { status: "blocked"; plan: SafeLiveCandidateWritePlan }
   | { status: "ok"; commands: BaseCommandSpec[]; planNonce: string; candidateDisplayName: string }
 > {
-  const configFn = deps?.loadConfig ?? loadConfig;
-  const executor = deps?.executor;
+  const ctx = await readLiveCandidateContext(linkId, { requireJob: true, deps });
 
-  // 1. Validate linkId
-  const entry = getLiveLinkRegistry().resolve(linkId);
-  if (!entry) {
-    return { status: "blocked", plan: buildBlockedPlan("未找到对应的飞书记录链接。") };
-  }
-  if (entry.table !== "candidates") {
-    return { status: "blocked", plan: buildBlockedPlan("当前仅支持对候选人记录执行写入。") };
+  if (ctx.status === "blocked") {
+    return { status: "blocked", plan: buildBlockedPlan(ctx.safeSummary) };
   }
 
-  // 2. Check Base status
-  const config = configFn();
-  const baseStatus = getLiveBaseStatus({
-    loadConfig: configFn,
-    cliAvailable: deps?.cliAvailable,
-  });
-  if (baseStatus.blockedReasons.length > 0) {
-    return { status: "blocked", plan: buildBlockedPlan("飞书只读未就绪，无法生成写入计划。") };
-  }
+  const {
+    entry, candidateRecordId, jobRecordId, candidateId, jobId,
+    resumeText, jobRequirements, jobRubric, candidateDisplayName,
+  } = ctx.context;
 
-  // 3. Read candidate record
-  const candidateCmd = buildListRecordsCommand("candidates");
-  const candidateResult = quietConsole(() => runReadOnlyCommands({
-    commands: [candidateCmd],
-    config,
-    execute: true,
-    executor,
-  }));
-
-  if (candidateResult.blocked) {
-    return { status: "blocked", plan: buildBlockedPlan("飞书只读被阻断，无法读取候选人记录。") };
-  }
-
-  const candidateOutput = candidateResult.results[0];
-  if (!candidateOutput || candidateOutput.status !== "success" || !candidateOutput.stdout) {
-    return { status: "blocked", plan: buildBlockedPlan("无法读取飞书候选人数据。") };
-  }
-
-  let candidateRecords: Array<{ id: string; fields: Record<string, unknown> }>;
-  try {
-    candidateRecords = parseRecordList(candidateOutput.stdout).records;
-  } catch {
-    return { status: "blocked", plan: buildBlockedPlan("飞书候选人数据解析失败。") };
-  }
-
-  const candidate = candidateRecords.find((r) => r.id === entry.recordId);
-  if (!candidate) {
-    return { status: "blocked", plan: buildBlockedPlan("未在飞书中找到对应候选人。") };
-  }
-
-  const fields = candidate.fields;
-  const candidateDisplayName = extractTextField(fields, "display_name") ?? "未知候选人";
-
-  // 4. Extract candidate fields
-  const candidateId = extractTextField(fields, "candidate_id") ?? `cand_live_${entry.recordId.slice(0, 8)}`;
-  const resumeText = extractTextField(fields, "resume_text");
-  const jobDisplay = extractTextField(fields, "job");
-  const linkedJobRecordId = extractLinkRecordId(fields, "job");
-
-  if (!resumeText) {
-    return { status: "blocked", plan: buildBlockedPlan("候选人缺少简历文本，无法生成写入计划。") };
-  }
-
-  // 5. Read job
-  let jobRecordId = "rec_job_unknown";
-  let jobId = "job_unknown";
-  let jobRequirements = "";
-  let jobRubric = "";
-
-  if (linkedJobRecordId || jobDisplay) {
-    const jobsCmd = buildListRecordsCommand("jobs");
-    const jobsResult = quietConsole(() => runReadOnlyCommands({
-      commands: [jobsCmd],
-      config,
-      execute: true,
-      executor,
-    }));
-
-    if (!jobsResult.blocked) {
-      const jobsOutput = jobsResult.results[0];
-      if (jobsOutput && jobsOutput.status === "success" && jobsOutput.stdout) {
-        try {
-          const jobsRecords = parseRecordList(jobsOutput.stdout).records;
-          const matched = jobsRecords.find((j) => {
-            if (linkedJobRecordId && j.id === linkedJobRecordId) return true;
-            const title = extractTextField(j.fields, "title");
-            return title === jobDisplay;
-          });
-          if (matched) {
-            jobRecordId = matched.id;
-            jobId = extractTextField(matched.fields, "job_id") ?? "job_live";
-            jobRequirements = extractTextField(matched.fields, "requirements") ?? "";
-            jobRubric = extractTextField(matched.fields, "rubric") ?? "";
-          }
-        } catch {
-          // Continue with fallback
-        }
-      }
-    }
-  }
-
-  if (!jobRequirements || !jobRubric) {
-    return { status: "blocked", plan: buildBlockedPlan("无法获取岗位要求或评分标准。") };
-  }
-
-  // 6. Run deterministic pipeline
+  // Run deterministic pipeline
   const input: CandidatePipelineInput = {
-    candidateRecordId: entry.recordId,
-    jobRecordId,
+    candidateRecordId,
+    jobRecordId: jobRecordId!,
     candidateId,
-    jobId,
+    jobId: jobId!,
     resumeText,
-    jobRequirements,
-    jobRubric,
+    jobRequirements: jobRequirements!,
+    jobRubric: jobRubric!,
   };
 
   const client = new DeterministicLlmClient();
