@@ -1266,7 +1266,7 @@
     }
   }
 
-  function renderLiveRecords(containerId, records, title, colName, colMeta, colExtra) {
+  function renderLiveRecords(containerId, records, title, colName, colMeta, colExtra, showRunBtn) {
     var el = document.getElementById(containerId);
     if (!el) return;
     if (!records || records.length === 0) {
@@ -1281,19 +1281,26 @@
     var rows = "";
     for (var i = 0; i < records.length; i++) {
       var r = records[i];
-      var name = esc(String(r[colName] || ""));
+      var rawName = String(r[colName] || "");
+      var name = esc(rawName);
       var meta = (colMeta || []).map(function (k) {
         var v = r[k];
         if (v === null || v === undefined || v === "") return "";
         return '<span class="live-record-meta-item">' + esc(String(v)) + "</span>";
       }).filter(Boolean).join(" &middot; ");
       var extra = colExtra ? colExtra(r) : "";
-      var btn = "";
+      var btns = "";
       if (r.link && r.link.available && r.link.link_id) {
-        btn =
+        btns +=
           '<button type="button" class="live-open-btn" data-link-id="' +
           esc(String(r.link.link_id)) +
           '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg> 打开飞书</button>';
+        if (showRunBtn) {
+          btns +=
+            '<button type="button" class="live-run-btn" data-link-id="' +
+            esc(String(r.link.link_id)) +
+            '" data-name="' + esc(rawName) + '">运行 Agent 预演</button>';
+        }
       }
       rows +=
         '<div class="live-record-row">' +
@@ -1301,17 +1308,25 @@
         '<span class="live-record-name">' + name + "</span>" +
         '<span class="live-record-meta">' + meta + extra + "</span>" +
         "</div>" +
-        btn +
+        '<div class="live-record-actions">' + btns + "</div>" +
         "</div>";
     }
     el.innerHTML =
       '<div class="live-card-panel">' + head + '<div class="live-card-body">' + rows + "</div></div>";
 
-    var buttons = el.querySelectorAll(".live-open-btn");
-    for (var b = 0; b < buttons.length; b++) {
-      buttons[b].addEventListener("click", function (ev) {
+    var openBtns = el.querySelectorAll(".live-open-btn");
+    for (var b = 0; b < openBtns.length; b++) {
+      openBtns[b].addEventListener("click", function (ev) {
         var linkId = ev.currentTarget.getAttribute("data-link-id");
         window._hireloopOpenFeishu(linkId);
+      });
+    }
+    var runBtns = el.querySelectorAll(".live-run-btn");
+    for (var r2 = 0; r2 < runBtns.length; r2++) {
+      runBtns[r2].addEventListener("click", function (ev) {
+        var linkId = ev.currentTarget.getAttribute("data-link-id");
+        var name = ev.currentTarget.getAttribute("data-name");
+        window._hireloopRunDryRun(linkId, name, ev.currentTarget);
       });
     }
   }
@@ -1339,6 +1354,7 @@
                 if (r.screening_recommendation) tags += '<span class="live-record-tag">' + esc(r.screening_recommendation) + "</span>";
                 return tags;
               },
+              true,  // showRunBtn
             );
             renderLiveRecords(
               "live-jobs",
@@ -1347,6 +1363,7 @@
               "title",
               ["department", "level", "status", "owner"],
               null,
+              false,  // no run btn for jobs
             );
           }).catch(function () {
             var grid = document.getElementById("live-grid");
@@ -1366,10 +1383,67 @@
       });
   }
 
-  // Expose open-feishu for onclick
+  // Expose live actions for dynamically rendered buttons.
   window._hireloopOpenFeishu = function (linkId) {
     if (!linkId) return;
     window.open("/go/" + encodeURIComponent(linkId), "_blank", "noopener");
+  };
+
+  window._hireloopRunDryRun = function (linkId, name, btnEl) {
+    if (!linkId) return;
+    if (btnEl) {
+      btnEl.disabled = true;
+      btnEl.textContent = "运行中...";
+    }
+    var hint = document.getElementById("live-data-hint");
+    var displayName = name || "候选人";
+    if (hint) hint.textContent = "正在运行 " + displayName + " 的 Agent 预演...";
+
+    fetch("/api/live/candidates/" + encodeURIComponent(linkId) + "/run-dry-run", { method: "POST" })
+      .then(function (res) {
+        return res.json().then(function (data) {
+          if (!res.ok) throw new Error((data && data.safeSummary) || "运行失败");
+          return data;
+        });
+      })
+      .then(function (data) {
+        var msg = "";
+        if (data && data.status === "success") {
+          msg = displayName + " Agent 预演完成：" + (data.safeSummary || "");
+          if (data.snapshotUpdated) msg += " 本地运行快照已更新，可查看最新流水线与组织总览。";
+        } else if (data && data.status === "blocked") {
+          msg = displayName + " 预演未执行：" + (data.safeSummary || "条件不满足。");
+        } else {
+          msg = displayName + " 预演失败：" + ((data && data.safeSummary) || "未知错误。");
+        }
+        if (hint) { hint.textContent = msg; setTimeout(function () { hint.textContent = "飞书 Base 实时数据 · 只读模式"; }, 8000); }
+        if (data && data.status === "success" && data.snapshotUpdated) {
+          setTimeout(function () { window._hireloopReloadAfterRun && window._hireloopReloadAfterRun(); }, 500);
+        }
+      })
+      .catch(function () {
+        if (hint) hint.textContent = "Agent 预演运行失败，请稍后重试。";
+        setTimeout(function () { if (hint) hint.textContent = "飞书 Base 实时数据 · 只读模式"; }, 6000);
+      })
+      .finally(function () {
+        if (btnEl) {
+          btnEl.disabled = false;
+          btnEl.textContent = "运行 Agent 预演";
+        }
+      });
+  };
+
+  window._hireloopReloadAfterRun = function () {
+    fetchJson("/api/org/overview").then(function (org) {
+      renderDataSource(org);
+      renderOrgOverview(org, []);
+    }).catch(function () {});
+    fetchJson("/api/demo/pipeline").then(function (data) {
+      renderPipeline(data, null);
+    }).catch(function () {});
+    fetchJson("/api/work-events").then(function (events) {
+      renderWorkEvents(events);
+    }).catch(function () {});
   };
 
   function load() {

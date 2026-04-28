@@ -147,6 +147,33 @@ describe("server API routes", () => {
     }
   });
 
+  // ── Phase 6.8: Dry-run routes ──
+
+  it("POST /api/live/candidates/:linkId/run-dry-run with unknown link returns blocked", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/candidates/lnk_live_nonexistent/run-dry-run`, { method: "POST" });
+    assert.ok(res.ok);
+    const data = await res.json() as Record<string, unknown>;
+    assert.equal(data.status, "blocked");
+  });
+
+  it("GET /api/live/candidates/:linkId/run-dry-run returns 404", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/candidates/lnk_live_test123/run-dry-run`);
+    assert.equal(res.status, 404);
+  });
+
+  it("dry-run response does not leak rec_/resume/payload/stdout/stderr", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/candidates/lnk_live_nonexistent/run-dry-run`, { method: "POST" });
+    const text = await res.text();
+    assert.ok(!text.includes("rec_"), "must not contain rec_");
+    assert.ok(!text.includes("resume"), "must not contain resume");
+    assert.ok(!text.includes("payload"), "must not contain payload");
+    assert.ok(!text.includes("stdout"), "must not contain stdout");
+    assert.ok(!text.includes("stderr"), "must not contain stderr");
+    assert.ok(!text.includes("record_id"), "must not contain record_id");
+    assert.ok(!text.includes("prompt"), "must not contain prompt");
+    assert.ok(!text.includes("apiKey"), "must not contain apiKey");
+  });
+
   it("GET /go/lnk_live_* returns 302 with FEISHU_BASE_WEB_URL configured", async () => {
     const prev = process.env.FEISHU_BASE_WEB_URL;
     const prevCandidates = process.env.FEISHU_CANDIDATES_WEB_URL;

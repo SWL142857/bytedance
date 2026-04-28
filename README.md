@@ -68,6 +68,7 @@ new → parsed → screened → interview_kit_ready → decision_pending → off
 | Phase 6.4 | 完成 | Live dataset agent runner：`pnpm dataset:run` 支持 JSON array / JSONL 输入，默认 deterministic，provider execute 与 Base write 均受显式守卫且 fail-closed |
 | Phase 6.6 | 完成 | 真实 forbidden trace scanner 已接入 release gate、API boundary audit 和 server report；`pnpm scan:forbidden-traces` 当前 0 findings |
 | Phase 6.7 | 完成 | 飞书实时只读 + 安全跳转：`GET /api/live/base-status`、`GET /api/live/records?table=`、`/go/lnk_live_*` 302 到飞书 Base/对应表格页面；`HIRELOOP_ALLOW_LARK_READ=1` 独立只读开关；前端展示候选人/岗位实时数据与"打开飞书"按钮 |
+| Phase 6.8 | 完成 | 前端候选人卡片可点击运行 deterministic Agent 预演，服务端只读解析真实候选人/岗位数据，写入本地安全 runtime snapshot；不写飞书、不外呼模型 |
 
 当前开发重点：
 
@@ -77,7 +78,7 @@ new → parsed → screened → interview_kit_ready → decision_pending → off
 | Phase 6.2 — 操作员控制台 | 类型与只读任务清单已就绪 | `src/types/operator-task.ts`、`src/server/operator-tasks-demo.ts` 与 `GET /api/operator/tasks` 已落地，仅返回安全的只读任务清单（每个任务 `execute_enabled=false`），尚未提供任何 execute / spawn 入口；真实执行需要后续阶段开放并经人工确认 |
 | Phase 6.3 — 数据伙伴接口契约 | 待定 | 与数据/RAG 侧对齐 `JobContext`、`CandidateProfile`、`RetrievedEvidence[]`、`AgentInputBundle` 等接口，先 mock 后替换 |
 | Phase 6.5 — Provider dataset execute verification | 本地待验收 | `pnpm provider:dataset-verify` 已接入本地脚本入口，范围仅 provider 模型执行验证 + 本地 runtime snapshot，不做 Base 写入；blocked 时不 fallback deterministic |
-| Phase 6.8 — 从前端点击运行 Agent Dry-run | 计划中 | `POST /api/live/candidates/:linkId/run-dry-run`，从 UI 选真实飞书候选人跑 deterministic pipeline，不写飞书 |
+| Phase 6.8 — 从前端点击运行 Agent Dry-run | 完成 | `POST /api/live/candidates/:linkId/run-dry-run`，从 UI 选真实飞书候选人跑 deterministic pipeline，不写飞书、不外呼模型 |
 | Phase 6.9 — Provider Agent Preview | 计划中 | 显式开启后对真实候选人跑 provider Agent preview，需确认短语，不写 Base |
 | Phase 7.0 — 人工确认写回飞书 | 计划中 | 两步写回：生成 write plan → 双确认执行，仅推进到 decision_pending，不做 offer/rejected |
 
@@ -237,8 +238,27 @@ export FEISHU_WORK_EVENTS_WEB_URL=<Work Events 表格页面 URL>
 
 **测试：** 无 env 时 `GET /api/live/base-status` 返回 `readEnabled=false` 和 blocked reasons，非 500；mock executor 下 `GET /api/live/records` 返回 safe projection；`/go/lnk_live_*` 在配置 Base URL 时返回 302。
 
+### 点击运行 Agent 预演（Phase 6.8）
+
+**前置条件：** 与 Phase 6.7 相同（飞书应用凭证 + `HIRELOOP_ALLOW_LARK_READ=1`）。
+
+**API：** `POST /api/live/candidates/:linkId/run-dry-run`
+- linkId 必须来自 live link registry（候选人记录）
+- 服务端通过只读 lark-cli 重新读取候选人字段和关联岗位信息
+- 使用 deterministic LLM client 运行 4-agent pipeline（Resume Parser → Screening → Interview Kit → HR Coordinator）
+- 成功后将安全 runtime snapshot 写入 `tmp/latest-agent-runtime.json`
+- 返回 `{ status, finalStatus, completed, agentRunCount, commandCount, snapshotUpdated, safeSummary }`
+- blocked 条件：link 无效、非候选人、read env 缺失、候选人缺简历、岗位缺要求/评分标准
+
+**安全约束：**
+- 不使用 provider 模型，不写飞书 Base
+- 不依赖 `HIRELOOP_ALLOW_LARK_WRITE`
+- 响应不含 record_id、resume_text、payload、command args、stdout/stderr
+- 失败返回固定中文安全文案，不透传 err.message
+
+**UI：** 飞书实时数据的候选人卡片新增"运行 Agent 预演"按钮；点击后 POST、显示 loading、成功/失败/blocked 状态提示；快照写入后自动刷新流水线和组织总览。
+
 **下一步（计划中）：**
-- Phase 6.8：从前端选候选人，点击运行 Agent Dry-run（deterministic，不写飞书）
 - Phase 6.9：Provider Agent Preview（需确认短语，不写飞书）
 - Phase 7.0：两步写回飞书（生成 write plan → 双确认执行），仅推进状态，不做 offer/rejected
 

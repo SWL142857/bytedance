@@ -14,6 +14,7 @@ import { buildLiveReadinessReport } from "../orchestrator/live-readiness-report.
 import { loadConfig } from "../config.js";
 import { getLiveBaseStatus, listLiveRecords } from "./live-base.js";
 import { getLiveLinkRegistry } from "./live-link-registry.js";
+import { runLiveCandidateDryRun } from "../orchestrator/live-candidate-runner.js";
 import { buildDemoWorkEvents } from "./work-events-demo.js";
 import { buildOperatorTasksOverview } from "./operator-tasks-demo.js";
 import {
@@ -280,6 +281,16 @@ async function handleApi(
     if (url.pathname === "/api/live/records" && req.method === "GET") {
       const table = url.searchParams.get("table") ?? "";
       const result = await listLiveRecords(table);
+      jsonResponse(res, result);
+      return;
+    }
+
+    // ── Phase 6.8: Click-to-run Agent Dry-run ──
+
+    const dryRunMatch = /^\/api\/live\/candidates\/(lnk_live_[a-z0-9]+)\/run-dry-run$/.exec(url.pathname);
+    if (dryRunMatch && dryRunMatch[1] && req.method === "POST") {
+      const linkId = dryRunMatch[1];
+      const result = await runLiveCandidateDryRun(linkId);
       jsonResponse(res, result);
       return;
     }
