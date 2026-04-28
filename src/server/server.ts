@@ -16,6 +16,10 @@ import { getLiveBaseStatus, listLiveRecords } from "./live-base.js";
 import { getLiveLinkRegistry } from "./live-link-registry.js";
 import { runLiveCandidateDryRun } from "../orchestrator/live-candidate-runner.js";
 import { runLiveCandidateProviderAgentDemo } from "../orchestrator/live-candidate-runner.js";
+import {
+  generateLiveCandidateWritePlan,
+  executeLiveCandidateWrites,
+} from "../orchestrator/live-candidate-write-runner.js";
 import { buildDemoWorkEvents } from "./work-events-demo.js";
 import { buildOperatorTasksOverview } from "./operator-tasks-demo.js";
 import {
@@ -31,6 +35,8 @@ import {
   redactProviderAgentDemo,
   redactPreApiFreeze,
   redactLiveReadiness,
+  redactLiveCandidateWritePlan,
+  redactLiveCandidateWriteResult,
   redactWorkEvents,
 } from "./redaction.js";
 import type { OrgOverviewAgentView, OrgOverviewView } from "../types/work-event.js";
@@ -382,6 +388,64 @@ async function handleApi(
 
       const result = await runLiveCandidateProviderAgentDemo(linkId, { confirm: body.confirm as string });
       jsonResponse(res, redactProviderAgentDemo(result));
+      return;
+    }
+
+    // ── Phase 7.0: Live Candidate Write-Back (Two-Step) ──
+
+    const writePlanMatch = /^\/api\/live\/candidates\/(lnk_live_[a-z0-9]+)\/generate-write-plan$/.exec(url.pathname);
+    if (writePlanMatch && writePlanMatch[1] && req.method === "POST") {
+      if (!isLocalRequest(req)) {
+        errorResponse(res, 403, "仅允许本地访问");
+        return;
+      }
+      const linkId = writePlanMatch[1];
+      const plan = await generateLiveCandidateWritePlan(linkId);
+      jsonResponse(res, redactLiveCandidateWritePlan(plan));
+      return;
+    }
+
+    const writeExecMatch = /^\/api\/live\/candidates\/(lnk_live_[a-z0-9]+)\/execute-writes$/.exec(url.pathname);
+    if (writeExecMatch && writeExecMatch[1] && req.method === "POST") {
+      if (!isLocalRequest(req)) {
+        errorResponse(res, 403, "仅允许本地访问");
+        return;
+      }
+      if (!requireJsonContentType(req, res)) {
+        return;
+      }
+      const linkId = writeExecMatch[1];
+
+      let body: Record<string, unknown>;
+      try {
+        body = await parseJsonBody(req);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "";
+        if (msg.includes("too large")) {
+          errorResponse(res, 413, "请求体过大");
+        } else {
+          errorResponse(res, 400, "请求格式错误");
+        }
+        return;
+      }
+
+      const confirmed = body.confirm === "EXECUTE_LIVE_CANDIDATE_WRITES";
+      if (!confirmed) {
+        errorResponse(res, 403, "确认短语错误，拒绝执行。");
+        return;
+      }
+      const reviewConfirmed = body.reviewConfirm === "REVIEWED_DECISION_PENDING_WRITE_PLAN";
+      if (!reviewConfirmed) {
+        errorResponse(res, 403, "审阅确认短语错误，请先审阅写入计划。");
+        return;
+      }
+
+      const result = await executeLiveCandidateWrites(linkId, {
+        confirm: body.confirm as string,
+        reviewConfirm: body.reviewConfirm as string,
+        planNonce: (body.planNonce as string) ?? "",
+      });
+      jsonResponse(res, redactLiveCandidateWriteResult(result));
       return;
     }
 

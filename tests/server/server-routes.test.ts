@@ -310,6 +310,148 @@ describe("server API routes", () => {
     assert.ok(!text.includes(".ts:"), "must not leak .ts: paths");
   });
 
+  // ── Phase 7.0: Live Candidate Write-Back ──
+
+  it("POST /api/live/candidates/:linkId/generate-write-plan with unknown link returns blocked", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/candidates/lnk_live_nonexistent/generate-write-plan`, { method: "POST" });
+    assert.ok(res.ok);
+    const data = await res.json() as Record<string, unknown>;
+    assert.equal(data.status, "blocked");
+    assert.ok(Array.isArray(data.blockedReasons));
+  });
+
+  it("POST /api/live/candidates/:linkId/generate-write-plan with registered link returns planned or blocked", async () => {
+    const { getLiveLinkRegistry } = await import("../../src/server/live-link-registry.js");
+    const linkId = getLiveLinkRegistry().register("candidates", "rec_test_write_plan_001");
+    const res = await fetch(`${BASE_URL}/api/live/candidates/${linkId}/generate-write-plan`, { method: "POST" });
+    assert.ok(res.ok);
+    const data = await res.json() as Record<string, unknown>;
+    // Without lark-cli, Base status will be blocked; but the route itself works
+    assert.ok(data.status === "planned" || data.status === "blocked");
+    assert.equal(typeof data.planNonce, "string");
+  });
+
+  const WRITE_BODY = {
+    confirm: "EXECUTE_LIVE_CANDIDATE_WRITES",
+    reviewConfirm: "REVIEWED_DECISION_PENDING_WRITE_PLAN",
+    planNonce: "deadbeef12345678",
+  };
+
+  it("POST /api/live/candidates/:linkId/execute-writes with wrong confirm returns 403", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/candidates/lnk_live_test123/execute-writes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ confirm: "wrong", reviewConfirm: "REVIEWED_DECISION_PENDING_WRITE_PLAN", planNonce: "abc123" }),
+    });
+    assert.equal(res.status, 403);
+    const data = await res.json() as { error: string };
+    assert.equal(data.error, "确认短语错误，拒绝执行。");
+  });
+
+  it("POST /api/live/candidates/:linkId/execute-writes with wrong reviewConfirm returns 403", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/candidates/lnk_live_test123/execute-writes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ confirm: "EXECUTE_LIVE_CANDIDATE_WRITES", reviewConfirm: "wrong", planNonce: "abc123" }),
+    });
+    assert.equal(res.status, 403);
+  });
+
+  it("POST /api/live/candidates/:linkId/execute-writes rejects non-JSON content type", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/candidates/lnk_live_test123/execute-writes`, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify(WRITE_BODY),
+    });
+    assert.equal(res.status, 415);
+  });
+
+  it("POST /api/live/candidates/:linkId/execute-writes rejects oversized JSON body", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/candidates/lnk_live_test123/execute-writes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...WRITE_BODY, filler: "x".repeat(5000) }),
+    });
+    assert.equal(res.status, 413);
+  });
+
+  it("POST /api/live/candidates/:linkId/execute-writes with double confirm but invalid link returns blocked", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/candidates/lnk_live_nonexistent/execute-writes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(WRITE_BODY),
+    });
+    assert.ok(res.ok);
+    const data = await res.json() as Record<string, unknown>;
+    assert.equal(data.status, "blocked");
+    assert.equal(data.executed, false);
+  });
+
+  it("POST /api/live/candidates/:linkId/execute-writes with registered link and double confirm returns blocked when Base unavailable", async () => {
+    const { getLiveLinkRegistry } = await import("../../src/server/live-link-registry.js");
+    const linkId = getLiveLinkRegistry().register("candidates", "rec_test_write_exec_001");
+    const res = await fetch(`${BASE_URL}/api/live/candidates/${linkId}/execute-writes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...WRITE_BODY, planNonce: "deadbeef" }),
+    });
+    assert.ok(res.ok);
+    const data = await res.json() as Record<string, unknown>;
+    assert.equal(data.status, "blocked");
+    assert.equal(data.executed, false);
+  });
+
+  it("GET /api/live/candidates/:linkId/generate-write-plan returns 404", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/candidates/lnk_live_test123/generate-write-plan`);
+    assert.equal(res.status, 404);
+  });
+
+  it("GET /api/live/candidates/:linkId/execute-writes returns 404", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/candidates/lnk_live_test123/execute-writes`);
+    assert.equal(res.status, 404);
+  });
+
+  it("write plan and execute responses do not leak sensitive fields", async () => {
+    const paths = [
+      { path: "/api/live/candidates/lnk_live_nonexistent/generate-write-plan", method: "POST", body: null },
+      { path: "/api/live/candidates/lnk_live_nonexistent/execute-writes", method: "POST",
+        body: JSON.stringify(WRITE_BODY) },
+    ];
+    for (const { path, method, body } of paths) {
+      const opts: RequestInit = {
+        method,
+        headers: body ? { "Content-Type": "application/json" } : undefined,
+        body,
+      };
+      const res = await fetch(`${BASE_URL}${path}`, opts);
+      const text = await res.text();
+      assert.ok(!text.includes("rec_"), `${path} must not contain rec_`);
+      assert.ok(!text.includes("payload"), `${path} must not contain payload`);
+      assert.ok(!text.includes("stdout"), `${path} must not contain stdout`);
+      assert.ok(!text.includes("stderr"), `${path} must not contain stderr`);
+      assert.ok(!text.includes("apiKey"), `${path} must not contain apiKey`);
+      assert.ok(!text.includes("endpoint"), `${path} must not contain endpoint`);
+      assert.ok(!text.includes("modelId"), `${path} must not contain modelId`);
+      assert.ok(!text.includes("prompt"), `${path} must not contain prompt`);
+      assert.ok(!text.includes("baseAppToken"), `${path} must not contain baseAppToken`);
+    }
+  });
+
+  it("write plan and execute responses use safe Chinese error messages", async () => {
+    const { getLiveLinkRegistry } = await import("../../src/server/live-link-registry.js");
+    const linkId = getLiveLinkRegistry().register("candidates", "rec_test_safe_msg_001");
+    const res = await fetch(`${BASE_URL}/api/live/candidates/${linkId}/execute-writes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...WRITE_BODY, planNonce: "deadbeef" }),
+    });
+    const text = await res.text();
+    assert.ok(!text.includes("Error:"), "must not leak Error:");
+    assert.ok(!text.includes("stack"), "must not leak stack");
+    assert.ok(!text.includes(".ts:"), "must not leak .ts: paths");
+    assert.ok(!text.includes(".js:"), "must not leak .js: paths");
+  });
+
   it("GET /go/lnk_live_* returns 302 with FEISHU_BASE_WEB_URL configured", async () => {
     const prev = process.env.FEISHU_BASE_WEB_URL;
     const prevCandidates = process.env.FEISHU_CANDIDATES_WEB_URL;

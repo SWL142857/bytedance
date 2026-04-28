@@ -7,6 +7,10 @@ import type { ApiBoundaryAuditReport } from "../orchestrator/api-boundary-releas
 import type { ProviderAdapterReadiness } from "../llm/provider-adapter.js";
 import type { ProviderAgentDemoResult } from "../llm/provider-agent-demo-runner.js";
 import type { ProviderSmokeResult } from "../llm/provider-smoke-runner.js";
+import type {
+  SafeLiveCandidateWritePlan,
+  SafeLiveCandidateWriteResult,
+} from "../orchestrator/live-candidate-write-runner.js";
 import type { PreApiFreezeReport } from "../orchestrator/pre-api-freeze-report.js";
 import type { LiveReadinessReport } from "../orchestrator/live-readiness-report.js";
 import type {
@@ -190,6 +194,30 @@ export function redactLiveReadiness(report: LiveReadinessReport): LiveReadinessR
       summary: redactSafeText(check.summary),
     })),
     nextStep: redactSafeText(report.nextStep),
+  };
+}
+
+export function redactLiveCandidateWritePlan(
+  plan: SafeLiveCandidateWritePlan,
+): SafeLiveCandidateWritePlan {
+  return {
+    ...plan,
+    candidateDisplayName: sanitizeOptionalText(plan.candidateDisplayName),
+    commands: plan.commands.map((cmd) => ({
+      ...cmd,
+      description: redactSafeText(cmd.description),
+    })),
+    blockedReasons: plan.blockedReasons.map(redactSafeText),
+    safeSummary: redactSafeText(plan.safeSummary),
+  };
+}
+
+export function redactLiveCandidateWriteResult(
+  result: SafeLiveCandidateWriteResult,
+): SafeLiveCandidateWriteResult {
+  return {
+    ...result,
+    safeSummary: redactSafeText(result.safeSummary),
   };
 }
 
