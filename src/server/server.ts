@@ -15,6 +15,7 @@ import { loadConfig } from "../config.js";
 import { getLiveBaseStatus, listLiveRecords } from "./live-base.js";
 import { getLiveLinkRegistry } from "./live-link-registry.js";
 import { runLiveCandidateDryRun } from "../orchestrator/live-candidate-runner.js";
+import { runLiveCandidateProviderAgentDemo } from "../orchestrator/live-candidate-runner.js";
 import { buildDemoWorkEvents } from "./work-events-demo.js";
 import { buildOperatorTasksOverview } from "./operator-tasks-demo.js";
 import {
@@ -61,6 +62,54 @@ function jsonResponse(res: http.ServerResponse, data: unknown): void {
 function errorResponse(res: http.ServerResponse, status: number, message: string): void {
   res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
   res.end(JSON.stringify({ error: message }));
+}
+
+const LOOPBACK_RANGES = ["127.0.0.1", "::1", "::ffff:127.0.0.1"];
+
+export function isLoopbackAddress(remoteAddress: string | undefined): boolean {
+  return LOOPBACK_RANGES.includes(remoteAddress ?? "");
+}
+
+function isLocalRequest(req: http.IncomingMessage): boolean {
+  return isLoopbackAddress(req.socket.remoteAddress);
+}
+
+function requireJsonContentType(req: http.IncomingMessage, res: http.ServerResponse): boolean {
+  const raw = req.headers["content-type"] ?? "";
+  const mediaType = raw.split(";")[0]?.trim().toLowerCase() ?? "";
+  if (mediaType !== "application/json") {
+    errorResponse(res, 415, "不支持的媒体类型");
+    return false;
+  }
+  return true;
+}
+
+const MAX_BODY_BYTES = 4096;
+
+function parseJsonBody(req: http.IncomingMessage): Promise<Record<string, unknown>> {
+  return new Promise((resolve, reject) => {
+    let body = "";
+    let size = 0;
+    let overflowed = false;
+    req.on("data", (chunk: Buffer) => {
+      if (overflowed) return;
+      size += chunk.length;
+      if (size > MAX_BODY_BYTES) {
+        overflowed = true;
+        reject(new Error("Request body too large"));
+        return;
+      }
+      body += chunk.toString();
+    });
+    req.on("end", () => {
+      try {
+        resolve(JSON.parse(body) as Record<string, unknown>);
+      } catch {
+        reject(new Error("Invalid JSON body"));
+      }
+    });
+    req.on("error", reject);
+  });
 }
 
 function serveStatic(req: http.IncomingMessage, res: http.ServerResponse): boolean {
@@ -289,9 +338,50 @@ async function handleApi(
 
     const dryRunMatch = /^\/api\/live\/candidates\/(lnk_live_[a-z0-9]+)\/run-dry-run$/.exec(url.pathname);
     if (dryRunMatch && dryRunMatch[1] && req.method === "POST") {
+      if (!isLocalRequest(req)) {
+        errorResponse(res, 403, "仅允许本地访问");
+        return;
+      }
       const linkId = dryRunMatch[1];
       const result = await runLiveCandidateDryRun(linkId);
       jsonResponse(res, result);
+      return;
+    }
+
+    // ── Phase 6.9: Provider Agent Preview ──
+
+    const providerAgentDemoMatch = /^\/api\/live\/candidates\/(lnk_live_[a-z0-9]+)\/run-provider-agent-demo$/.exec(url.pathname);
+    if (providerAgentDemoMatch && providerAgentDemoMatch[1] && req.method === "POST") {
+      if (!isLocalRequest(req)) {
+        errorResponse(res, 403, "仅允许本地访问");
+        return;
+      }
+      if (!requireJsonContentType(req, res)) {
+        return;
+      }
+      const linkId = providerAgentDemoMatch[1];
+
+      let body: Record<string, unknown>;
+      try {
+        body = await parseJsonBody(req);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "";
+        if (msg.includes("too large")) {
+          errorResponse(res, 413, "请求体过大");
+        } else {
+          errorResponse(res, 400, "请求格式错误");
+        }
+        return;
+      }
+
+      const confirmed = body.confirm === "EXECUTE_PROVIDER_AGENT_DEMO";
+      if (!confirmed) {
+        errorResponse(res, 403, "确认短语错误，拒绝执行。");
+        return;
+      }
+
+      const result = await runLiveCandidateProviderAgentDemo(linkId, { confirm: body.confirm as string });
+      jsonResponse(res, redactProviderAgentDemo(result));
       return;
     }
 
@@ -484,7 +574,7 @@ export function createServer(options: UiServerOptions = {}): http.Server {
 
 export function startServer(port: number = PORT): http.Server {
   const server = createServer({ runtimeSnapshotPath: DEFAULT_RUNTIME_SNAPSHOT_PATH });
-  server.listen(port, () => {
+  server.listen(port, "127.0.0.1", () => {
     console.log(`HireLoop UI: http://localhost:${port}`);
   });
   return server;

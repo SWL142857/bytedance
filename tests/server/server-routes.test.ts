@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createServer } from "../../src/server/server.js";
+import { createServer, isLoopbackAddress } from "../../src/server/server.js";
 import type { Server } from "node:http";
 
 const BASE_URL = "http://localhost:3010";
@@ -174,6 +174,140 @@ describe("server API routes", () => {
     assert.ok(!text.includes("record_id"), "must not contain record_id");
     assert.ok(!text.includes("prompt"), "must not contain prompt");
     assert.ok(!text.includes("apiKey"), "must not contain apiKey");
+  });
+
+  // ── Phase 6.9: Provider Agent Preview routes ──
+
+  it("loopback guard only accepts local socket addresses", () => {
+    assert.equal(isLoopbackAddress("127.0.0.1"), true);
+    assert.equal(isLoopbackAddress("::1"), true);
+    assert.equal(isLoopbackAddress("::ffff:127.0.0.1"), true);
+    assert.equal(isLoopbackAddress("192.168.1.20"), false);
+    assert.equal(isLoopbackAddress("10.0.0.3"), false);
+    assert.equal(isLoopbackAddress(undefined), false);
+  });
+
+  it("POST /api/live/candidates/:linkId/run-provider-agent-demo with wrong confirm returns 403", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/candidates/lnk_live_test123/run-provider-agent-demo`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ confirm: "wrong" }),
+    });
+    assert.equal(res.status, 403);
+    const data = await res.json() as { error: string };
+    assert.equal(data.error, "确认短语错误，拒绝执行。");
+  });
+
+  it("POST /api/live/candidates/:linkId/run-provider-agent-demo with missing confirm returns 403", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/candidates/lnk_live_test123/run-provider-agent-demo`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    assert.equal(res.status, 403);
+  });
+
+  it("POST /api/live/candidates/:linkId/run-provider-agent-demo rejects non-JSON content type", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/candidates/lnk_live_test123/run-provider-agent-demo`, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain; note=application/json" },
+      body: JSON.stringify({ confirm: "EXECUTE_PROVIDER_AGENT_DEMO" }),
+    });
+    assert.equal(res.status, 415);
+    const data = await res.json() as { error: string };
+    assert.equal(data.error, "不支持的媒体类型");
+  });
+
+  it("POST /api/live/candidates/:linkId/run-provider-agent-demo accepts JSON content type case-insensitively", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/candidates/lnk_live_test123/run-provider-agent-demo`, {
+      method: "POST",
+      headers: { "Content-Type": "Application/JSON; charset=utf-8" },
+      body: JSON.stringify({ confirm: "wrong" }),
+    });
+    assert.equal(res.status, 403);
+    const data = await res.json() as { error: string };
+    assert.equal(data.error, "确认短语错误，拒绝执行。");
+  });
+
+  it("POST /api/live/candidates/:linkId/run-provider-agent-demo rejects oversized JSON body with 413", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/candidates/lnk_live_test123/run-provider-agent-demo`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        confirm: "EXECUTE_PROVIDER_AGENT_DEMO",
+        padding: "x".repeat(5000),
+      }),
+    });
+    assert.equal(res.status, 413);
+    const data = await res.json() as { error: string };
+    assert.equal(data.error, "请求体过大");
+  });
+
+  it("POST /api/live/candidates/:linkId/run-provider-agent-demo with invalid link returns blocked", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/candidates/lnk_live_nonexistent/run-provider-agent-demo`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ confirm: "EXECUTE_PROVIDER_AGENT_DEMO" }),
+    });
+    assert.ok(res.ok);
+    const data = await res.json() as Record<string, unknown>;
+    assert.equal(data.status, "blocked");
+    assert.ok(Array.isArray(data.blockedReasons));
+    const reasons = data.blockedReasons as string[];
+    assert.ok(reasons.some((r) => r.includes("未找到")), "should mention link not found");
+  });
+
+  it("POST /api/live/candidates/:linkId/run-provider-agent-demo with valid link returns blocked when Base unavailable", async () => {
+    const { getLiveLinkRegistry } = await import("../../src/server/live-link-registry.js");
+    const linkId = getLiveLinkRegistry().register("candidates", "rec_test_provider_demo_001");
+    const res = await fetch(`${BASE_URL}/api/live/candidates/${linkId}/run-provider-agent-demo`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ confirm: "EXECUTE_PROVIDER_AGENT_DEMO" }),
+    });
+    assert.ok(res.ok);
+    const data = await res.json() as Record<string, unknown>;
+    // Without lark-cli and env, Base status will be blocked
+    assert.equal(data.status, "blocked");
+    assert.equal(typeof data.providerName, "string");
+    assert.equal(typeof data.safeSummary, "string");
+  });
+
+  it("GET /api/live/candidates/:linkId/run-provider-agent-demo returns 404", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/candidates/lnk_live_test123/run-provider-agent-demo`);
+    assert.equal(res.status, 404);
+  });
+
+  it("provider agent demo response does not leak sensitive fields", async () => {
+    const { getLiveLinkRegistry } = await import("../../src/server/live-link-registry.js");
+    const linkId = getLiveLinkRegistry().register("candidates", "rec_test_sensitive_001");
+    const res = await fetch(`${BASE_URL}/api/live/candidates/${linkId}/run-provider-agent-demo`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ confirm: "EXECUTE_PROVIDER_AGENT_DEMO" }),
+    });
+    const text = await res.text();
+    assert.ok(!text.includes("rec_"), "must not contain rec_");
+    assert.ok(!text.includes("resume"), "must not contain resume text");
+    assert.ok(!text.includes("payload"), "must not contain payload");
+    assert.ok(!text.includes("stdout"), "must not contain stdout");
+    assert.ok(!text.includes("stderr"), "must not contain stderr");
+    assert.ok(!text.includes("apiKey"), "must not contain apiKey");
+    assert.ok(!text.includes("endpoint"), "must not contain endpoint");
+    assert.ok(!text.includes("modelId"), "must not contain modelId");
+    assert.ok(!text.includes("prompt"), "must not contain prompt");
+  });
+
+  it("provider agent demo with correct confirm uses safe Chinese error messages", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/candidates/lnk_live_nonexistent/run-provider-agent-demo`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ confirm: "EXECUTE_PROVIDER_AGENT_DEMO" }),
+    });
+    const text = await res.text();
+    assert.ok(!text.includes("Error:"), "must not leak Error:");
+    assert.ok(!text.includes("stack"), "must not leak stack");
+    assert.ok(!text.includes(".ts:"), "must not leak .ts: paths");
   });
 
   it("GET /go/lnk_live_* returns 302 with FEISHU_BASE_WEB_URL configured", async () => {

@@ -79,7 +79,7 @@ new → parsed → screened → interview_kit_ready → decision_pending → off
 | Phase 6.3 — 数据伙伴接口契约 | 待定 | 与数据/RAG 侧对齐 `JobContext`、`CandidateProfile`、`RetrievedEvidence[]`、`AgentInputBundle` 等接口，先 mock 后替换 |
 | Phase 6.5 — Provider dataset execute verification | 本地待验收 | `pnpm provider:dataset-verify` 已接入本地脚本入口，范围仅 provider 模型执行验证 + 本地 runtime snapshot，不做 Base 写入；blocked 时不 fallback deterministic |
 | Phase 6.8 — 从前端点击运行 Agent Dry-run | 完成 | `POST /api/live/candidates/:linkId/run-dry-run`，从 UI 选真实飞书候选人跑 deterministic pipeline，不写飞书、不外呼模型 |
-| Phase 6.9 — Provider Agent Preview | 计划中 | 显式开启后对真实候选人跑 provider Agent preview，需确认短语，不写 Base |
+| Phase 6.9 — Provider Agent Preview | 完成 | `POST /api/live/candidates/:linkId/run-provider-agent-demo`，Confirm 确认后调用外部模型对真实候选人跑 Resume Parser，不写 Base |
 | Phase 7.0 — 人工确认写回飞书 | 计划中 | 两步写回：生成 write plan → 双确认执行，仅推进到 decision_pending，不做 offer/rejected |
 
 Phase 6.0 的最低验收边界（已完成）：
@@ -259,7 +259,7 @@ export FEISHU_WORK_EVENTS_WEB_URL=<Work Events 表格页面 URL>
 **UI：** 飞书实时数据的候选人卡片新增"运行 Agent 预演"按钮；点击后 POST、显示 loading、成功/失败/blocked 状态提示；快照写入后自动刷新流水线和组织总览。
 
 **下一步（计划中）：**
-- Phase 6.9：Provider Agent Preview（需确认短语，不写飞书）
+- Phase 7.0：人工确认写回飞书
 - Phase 7.0：两步写回飞书（生成 write plan → 双确认执行），仅推进状态，不做 offer/rejected
 
 ## 模型 API 本地配置

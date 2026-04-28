@@ -11,6 +11,11 @@ import { runReadOnlyCommands, type CommandExecutor } from "../base/read-only-run
 import { parseRecordList } from "../base/lark-cli-runner.js";
 import type { HireLoopConfig } from "../config.js";
 import { loadConfig } from "../config.js";
+import {
+  runProviderAgentDemo,
+  type ProviderAgentDemoResult,
+} from "../llm/provider-agent-demo-runner.js";
+import type { ResumeParserInput } from "../agents/resume-parser.js";
 
 // ── Types ──
 
@@ -258,6 +263,227 @@ export async function runLiveCandidateDryRun(
       safeSummary: FIXED_ERROR_MSG,
       externalModelCalls: false,
       realWrites: false,
+    };
+  }
+}
+
+// ── Phase 6.9: Provider Agent Demo ──
+
+const PROVIDER_DEMO_CONFIRM = "EXECUTE_PROVIDER_AGENT_DEMO";
+
+export interface LiveCandidateProviderAgentDemoOptions {
+  confirm: string;
+  deps?: LiveCandidateRunnerDeps;
+}
+
+export async function runLiveCandidateProviderAgentDemo(
+  linkId: string,
+  options: LiveCandidateProviderAgentDemoOptions,
+): Promise<ProviderAgentDemoResult> {
+  const deps = options.deps;
+  const configFn = deps?.loadConfig ?? loadConfig;
+  const executor = deps?.executor;
+
+  // 0. Check confirm phrase at execution boundary
+  if (options.confirm !== PROVIDER_DEMO_CONFIRM) {
+    return {
+      mode: "execute",
+      status: "blocked",
+      providerName: configFn().modelProvider,
+      canCallExternalModel: false,
+      commandCount: null,
+      agentRunStatus: null,
+      retryCount: null,
+      durationMs: 0,
+      blockedReasons: ["确认短语错误，拒绝执行。"],
+      safeSummary: "确认短语错误，拒绝执行。",
+    };
+  }
+
+  // 1. Validate linkId
+  const entry = getLiveLinkRegistry().resolve(linkId);
+  if (!entry) {
+    return {
+      mode: "execute",
+      status: "blocked",
+      providerName: configFn().modelProvider,
+      canCallExternalModel: false,
+      commandCount: null,
+      agentRunStatus: null,
+      retryCount: null,
+      durationMs: 0,
+      blockedReasons: ["未找到对应的飞书记录链接。"],
+      safeSummary: "未找到对应的飞书记录链接。",
+    };
+  }
+  if (entry.table !== "candidates") {
+    return {
+      mode: "execute",
+      status: "blocked",
+      providerName: configFn().modelProvider,
+      canCallExternalModel: false,
+      commandCount: null,
+      agentRunStatus: null,
+      retryCount: null,
+      durationMs: 0,
+      blockedReasons: ["当前仅支持对候选人记录运行 Provider Agent 预览。"],
+      safeSummary: "当前仅支持对候选人记录运行 Provider Agent 预览。",
+    };
+  }
+
+  // 2. Check Base status
+  const config = configFn();
+  const status = getLiveBaseStatus({
+    loadConfig: configFn,
+    cliAvailable: deps?.cliAvailable,
+  });
+  if (status.blockedReasons.length > 0) {
+    return {
+      mode: "execute",
+      status: "blocked",
+      providerName: config.modelProvider,
+      canCallExternalModel: false,
+      commandCount: null,
+      agentRunStatus: null,
+      retryCount: null,
+      durationMs: 0,
+      blockedReasons: ["飞书只读未就绪，无法运行 Provider Agent 预览。"],
+      safeSummary: "飞书只读未就绪，无法运行 Provider Agent 预览。",
+    };
+  }
+
+  // 3. Read candidate record
+  const candidateCmd = buildListRecordsCommand("candidates");
+  const candidateResult = quietConsole(() => runReadOnlyCommands({
+    commands: [candidateCmd],
+    config,
+    execute: true,
+    executor,
+  }));
+
+  if (candidateResult.blocked) {
+    return {
+      mode: "execute",
+      status: "blocked",
+      providerName: config.modelProvider,
+      canCallExternalModel: false,
+      commandCount: null,
+      agentRunStatus: null,
+      retryCount: null,
+      durationMs: 0,
+      blockedReasons: ["飞书只读被阻断，无法读取候选人记录。"],
+      safeSummary: "飞书只读被阻断，无法读取候选人记录。",
+    };
+  }
+
+  const candidateOutput = candidateResult.results[0];
+  if (!candidateOutput || candidateOutput.status !== "success" || !candidateOutput.stdout) {
+    return {
+      mode: "execute",
+      status: "blocked",
+      providerName: config.modelProvider,
+      canCallExternalModel: false,
+      commandCount: null,
+      agentRunStatus: null,
+      retryCount: null,
+      durationMs: 0,
+      blockedReasons: ["无法读取飞书候选人数据。"],
+      safeSummary: "无法读取飞书候选人数据。",
+    };
+  }
+
+  let candidateRecords: Array<{ id: string; fields: Record<string, unknown> }>;
+  try {
+    candidateRecords = parseRecordList(candidateOutput.stdout).records;
+  } catch {
+    return {
+      mode: "execute",
+      status: "blocked",
+      providerName: config.modelProvider,
+      canCallExternalModel: false,
+      commandCount: null,
+      agentRunStatus: null,
+      retryCount: null,
+      durationMs: 0,
+      blockedReasons: ["飞书候选人数据解析失败。"],
+      safeSummary: "飞书候选人数据解析失败。",
+    };
+  }
+
+  const candidate = candidateRecords.find((r) => r.id === entry.recordId);
+  if (!candidate) {
+    return {
+      mode: "execute",
+      status: "blocked",
+      providerName: config.modelProvider,
+      canCallExternalModel: false,
+      commandCount: null,
+      agentRunStatus: null,
+      retryCount: null,
+      durationMs: 0,
+      blockedReasons: ["未在飞书中找到对应候选人。"],
+      safeSummary: "未在飞书中找到对应候选人。",
+    };
+  }
+
+  const fields = candidate.fields;
+
+  // 4. Extract candidate fields
+  const candidateId = extractTextField(fields, "candidate_id") ?? `cand_live_${entry.recordId.slice(0, 8)}`;
+  const resumeText = extractTextField(fields, "resume_text");
+
+  if (!resumeText) {
+    return {
+      mode: "execute",
+      status: "blocked",
+      providerName: config.modelProvider,
+      canCallExternalModel: false,
+      commandCount: null,
+      agentRunStatus: null,
+      retryCount: null,
+      durationMs: 0,
+      blockedReasons: ["候选人缺少简历文本，无法运行 Provider Agent 预览。"],
+      safeSummary: "候选人缺少简历文本，无法运行 Provider Agent 预览。",
+    };
+  }
+
+  // 5. Build provider adapter config and input
+  const providerConfig = {
+    enabled: true,
+    providerName: config.modelProvider,
+    endpoint: config.modelApiEndpoint,
+    modelId: config.modelId,
+    apiKey: config.modelApiKey,
+  };
+
+  const parserInput: ResumeParserInput = {
+    candidateRecordId: entry.recordId,
+    candidateId,
+    resumeText,
+    fromStatus: "new",
+  };
+
+  // 6. Run provider agent demo
+  try {
+    const result = await runProviderAgentDemo(
+      providerConfig,
+      { useProvider: true, execute: true, confirm: options.confirm },
+      undefined,
+      parserInput,
+    );
+    return result;
+  } catch {
+    return {
+      mode: "execute",
+      status: "failed",
+      providerName: config.modelProvider,
+      canCallExternalModel: true,
+      commandCount: null,
+      agentRunStatus: null,
+      retryCount: null,
+      durationMs: 0,
+      blockedReasons: [],
+      safeSummary: "Provider Agent 预览运行失败，请稍后重试。",
     };
   }
 }
