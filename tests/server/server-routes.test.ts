@@ -433,6 +433,238 @@ describe("server API routes", () => {
     assert.equal(res.status, 404);
   });
 
+  // ── Phase 7.7: Live Human Decision ──
+
+  const DECISION_PLAN_BODY = {
+    decision: "offer",
+    decidedBy: "hiring_manager",
+    decisionNote: "Strong technical skills and culture fit.",
+  };
+
+  const DECISION_EXEC_BODY = {
+    confirm: "EXECUTE_LIVE_HUMAN_DECISION",
+    reviewConfirm: "REVIEWED_HUMAN_DECISION_PLAN",
+    planNonce: "deadbeef12345678",
+    decision: "offer",
+    decidedBy: "hiring_manager",
+    decisionNote: "Strong technical skills and culture fit.",
+  };
+
+  it("POST generate-human-decision-plan with invalid decision returns 400", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/candidates/lnk_live_test123/generate-human-decision-plan`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ decision: "invalid", decidedBy: "mgr", decisionNote: "test" }),
+    });
+    assert.equal(res.status, 400);
+    const data = await res.json() as { error: string };
+    assert.ok(data.error.includes("decision"));
+  });
+
+  it("POST generate-human-decision-plan with missing decision returns 400", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/candidates/lnk_live_test123/generate-human-decision-plan`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ decidedBy: "mgr", decisionNote: "test" }),
+    });
+    assert.equal(res.status, 400);
+    const data = await res.json() as { error: string };
+    assert.ok(data.error.includes("decision"));
+  });
+
+  it("POST generate-human-decision-plan with empty decidedBy returns 400", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/candidates/lnk_live_test123/generate-human-decision-plan`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ decision: "offer", decidedBy: "", decisionNote: "test" }),
+    });
+    assert.equal(res.status, 400);
+    const data = await res.json() as { error: string };
+    assert.ok(data.error.includes("decidedBy"));
+  });
+
+  it("POST generate-human-decision-plan with empty decisionNote returns 400", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/candidates/lnk_live_test123/generate-human-decision-plan`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ decision: "offer", decidedBy: "mgr", decisionNote: "" }),
+    });
+    assert.equal(res.status, 400);
+    const data = await res.json() as { error: string };
+    assert.ok(data.error.includes("decisionNote"));
+  });
+
+  it("POST generate-human-decision-plan rejects non-JSON content type", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/candidates/lnk_live_test123/generate-human-decision-plan`, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify(DECISION_PLAN_BODY),
+    });
+    assert.equal(res.status, 415);
+  });
+
+  it("POST generate-human-decision-plan rejects oversized body", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/candidates/lnk_live_test123/generate-human-decision-plan`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...DECISION_PLAN_BODY, filler: "x".repeat(5000) }),
+    });
+    assert.equal(res.status, 413);
+  });
+
+  it("POST generate-human-decision-plan rejects non-object JSON", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/candidates/lnk_live_test123/generate-human-decision-plan`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "null",
+    });
+    assert.equal(res.status, 400);
+  });
+
+  it("POST generate-human-decision-plan with unknown link returns blocked", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/candidates/lnk_live_nonexistent/generate-human-decision-plan`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(DECISION_PLAN_BODY),
+    });
+    assert.ok(res.ok);
+    const data = await res.json() as Record<string, unknown>;
+    assert.equal(data.status, "blocked");
+    assert.ok(Array.isArray(data.blockedReasons));
+  });
+
+  it("POST generate-human-decision-plan with registered link returns planned or blocked", async () => {
+    const { getLiveLinkRegistry } = await import("../../src/server/live-link-registry.js");
+    const linkId = getLiveLinkRegistry().register("candidates", "rec_test_decision_plan_001");
+    const res = await fetch(`${BASE_URL}/api/live/candidates/${linkId}/generate-human-decision-plan`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(DECISION_PLAN_BODY),
+    });
+    assert.ok(res.ok);
+    const data = await res.json() as Record<string, unknown>;
+    assert.ok(data.status === "planned" || data.status === "blocked");
+    assert.equal(typeof data.planNonce, "string");
+  });
+
+  it("POST execute-human-decision with wrong confirm returns 403", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/candidates/lnk_live_test123/execute-human-decision`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...DECISION_EXEC_BODY, confirm: "wrong" }),
+    });
+    assert.equal(res.status, 403);
+    const data = await res.json() as { error: string };
+    assert.equal(data.error, "确认短语错误，拒绝执行。");
+  });
+
+  it("POST execute-human-decision with wrong reviewConfirm returns 403", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/candidates/lnk_live_test123/execute-human-decision`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...DECISION_EXEC_BODY, reviewConfirm: "wrong" }),
+    });
+    assert.equal(res.status, 403);
+    const data = await res.json() as { error: string };
+    assert.equal(data.error, "审阅确认短语错误，请先审阅决策计划。");
+  });
+
+  it("POST execute-human-decision with missing decision returns 400", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/candidates/lnk_live_test123/execute-human-decision`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ confirm: "EXECUTE_LIVE_HUMAN_DECISION", reviewConfirm: "REVIEWED_HUMAN_DECISION_PLAN", planNonce: "abc", decidedBy: "mgr", decisionNote: "test" }),
+    });
+    assert.equal(res.status, 400);
+  });
+
+  it("POST execute-human-decision rejects non-JSON content type", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/candidates/lnk_live_test123/execute-human-decision`, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify(DECISION_EXEC_BODY),
+    });
+    assert.equal(res.status, 415);
+  });
+
+  it("POST execute-human-decision rejects oversized body", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/candidates/lnk_live_test123/execute-human-decision`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...DECISION_EXEC_BODY, filler: "x".repeat(5000) }),
+    });
+    assert.equal(res.status, 413);
+  });
+
+  it("POST execute-human-decision rejects non-object JSON", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/candidates/lnk_live_test123/execute-human-decision`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "[]",
+    });
+    assert.equal(res.status, 400);
+  });
+
+  it("POST execute-human-decision with double confirm but unknown link returns blocked", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/candidates/lnk_live_nonexistent/execute-human-decision`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(DECISION_EXEC_BODY),
+    });
+    assert.ok(res.ok);
+    const data = await res.json() as Record<string, unknown>;
+    assert.equal(data.status, "blocked");
+    assert.equal(data.executed, false);
+  });
+
+  it("GET generate-human-decision-plan returns 404", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/candidates/lnk_live_test123/generate-human-decision-plan`);
+    assert.equal(res.status, 404);
+  });
+
+  it("GET execute-human-decision returns 404", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/candidates/lnk_live_test123/execute-human-decision`);
+    assert.equal(res.status, 404);
+  });
+
+  it("human decision responses do not leak sensitive fields", async () => {
+    const paths = [
+      { path: "/api/live/candidates/lnk_live_nonexistent/generate-human-decision-plan", body: JSON.stringify(DECISION_PLAN_BODY) },
+      { path: "/api/live/candidates/lnk_live_nonexistent/execute-human-decision", body: JSON.stringify(DECISION_EXEC_BODY) },
+    ];
+    for (const { path, body } of paths) {
+      const res = await fetch(`${BASE_URL}${path}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+      });
+      const text = await res.text();
+      assert.ok(!text.includes("rec_"), `${path} must not contain rec_`);
+      assert.ok(!text.includes("payload"), `${path} must not contain payload`);
+      assert.ok(!text.includes("stdout"), `${path} must not contain stdout`);
+      assert.ok(!text.includes("stderr"), `${path} must not contain stderr`);
+      assert.ok(!text.includes("apiKey"), `${path} must not contain apiKey`);
+      assert.ok(!text.includes("endpoint"), `${path} must not contain endpoint`);
+      assert.ok(!text.includes("modelId"), `${path} must not contain modelId`);
+      assert.ok(!text.includes("baseAppToken"), `${path} must not contain baseAppToken`);
+    }
+  });
+
+  it("human decision responses use safe Chinese error messages", async () => {
+    const { getLiveLinkRegistry } = await import("../../src/server/live-link-registry.js");
+    const linkId = getLiveLinkRegistry().register("candidates", "rec_test_decision_safe_001");
+    const res = await fetch(`${BASE_URL}/api/live/candidates/${linkId}/execute-human-decision`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...DECISION_EXEC_BODY, planNonce: "deadbeef" }),
+    });
+    const text = await res.text();
+    assert.ok(!text.includes("Error:"), "must not leak Error:");
+    assert.ok(!text.includes("stack"), "must not leak stack");
+    assert.ok(!text.includes(".ts:"), "must not leak .ts: paths");
+    assert.ok(!text.includes(".js:"), "must not leak .js: paths");
+  });
+
   it("write plan and execute responses do not leak sensitive fields", async () => {
     const paths = [
       { path: "/api/live/candidates/lnk_live_nonexistent/generate-write-plan", method: "POST", body: null },

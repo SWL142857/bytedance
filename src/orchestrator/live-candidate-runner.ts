@@ -92,7 +92,7 @@ export async function runLiveCandidateDryRun(
     jobRecordId: jobRecordId!,
     candidateId,
     jobId: jobId!,
-    resumeText,
+    resumeText: resumeText!,
     jobRequirements: jobRequirements!,
     jobRubric: jobRubric!,
   };
@@ -215,7 +215,7 @@ export async function runLiveCandidateProviderAgentDemo(
   const parserInput: ResumeParserInput = {
     candidateRecordId,
     candidateId,
-    resumeText,
+    resumeText: resumeText!,
     fromStatus: "new",
   };
 

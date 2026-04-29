@@ -174,6 +174,65 @@ POST /api/live/candidates/:linkId/execute-writes
 
 该路径会重新读取候选人和岗位、重新跑 pipeline、复算 nonce，通过后顺序执行写命令。当前只推进到 `decision_pending`，不写 `offer` / `rejected`。
 
+## Live Human Decision
+
+生成决策计划：
+
+```text
+POST /api/live/candidates/:linkId/generate-human-decision-plan
+```
+
+请求 body：
+
+```json
+{
+  "decision": "offer",
+  "decidedBy": "hiring_manager",
+  "decisionNote": "Strong technical skills and culture fit."
+}
+```
+
+返回安全摘要：
+
+- `status`
+- `planNonce`
+- `candidateDisplayName`
+- `commandCount`
+- `commands[].description`
+- `commands[].action`
+- `decision`
+- `safeSummary`
+
+不会返回 raw args、record ID、token 或 payload。
+
+执行决策写回：
+
+```text
+POST /api/live/candidates/:linkId/execute-human-decision
+```
+
+请求 body：
+
+```json
+{
+  "confirm": "EXECUTE_LIVE_HUMAN_DECISION",
+  "reviewConfirm": "REVIEWED_HUMAN_DECISION_PLAN",
+  "planNonce": "<generate-human-decision-plan 返回的 nonce>",
+  "decision": "offer",
+  "decidedBy": "hiring_manager",
+  "decisionNote": "Strong technical skills and culture fit."
+}
+```
+
+该路径会重新读取候选人、复算 nonce，通过后写入 Candidates human decision fields + 状态更新。只有 `decision_pending` 状态的候选人可执行。Agent 不能触发 offer/rejected，只有 `human_confirm` actor 可以。
+
+安全约束：
+
+- 双确认短语 + planNonce TOCTOU guard。
+- 非 `decision_pending` 候选人 blocked。
+- 响应不包含 record ID、token、stdout/stderr、payload。
+- 缺少 `HIRELOOP_ALLOW_LARK_WRITE=1` 时阻断执行。
+
 ## Provider Dataset Verification
 
 ```bash
@@ -205,4 +264,4 @@ pnpm base:bootstrap:dry-run
 pnpm ui:dev
 ```
 
-真实飞书写回演示目前建议停在 `decision_pending`，等 [Live MVP Work Plan](live-mvp-work-plan.md) 中的 human decision 和 analytics runner 补齐后再串完整闭环。
+真实飞书写回演示现在可以走到 `decision_pending -> offer/rejected` 的人工最终决策；完整闭环还差 [Live MVP Work Plan](live-mvp-work-plan.md) 中的 live analytics runner。

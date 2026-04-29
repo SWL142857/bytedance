@@ -5,6 +5,7 @@ import { runReadOnlyCommands, type CommandExecutor } from "../base/read-only-run
 import { parseRecordList } from "../base/lark-cli-runner.js";
 import type { HireLoopConfig } from "../config.js";
 import { loadConfig } from "../config.js";
+import type { CandidateStatus } from "../types/state.js";
 
 // ── Types ──
 
@@ -16,6 +17,7 @@ export interface LiveCandidateDeps {
 
 export interface ReadLiveCandidateContextOptions {
   requireJob?: boolean;
+  requireResume?: boolean;
   deps?: LiveCandidateDeps;
 }
 
@@ -26,7 +28,8 @@ export interface LiveCandidateContext {
   candidateRecordId: string;
   candidateId: string;
   candidateDisplayName: string;
-  resumeText: string;
+  candidateStatus: CandidateStatus | null;
+  resumeText: string | null;
   jobRecordId: string | null;
   jobId: string | null;
   jobRequirements: string | null;
@@ -48,6 +51,16 @@ export interface LiveCandidateContextBlocked {
 export type LiveCandidateContextResult = LiveCandidateContextOk | LiveCandidateContextBlocked;
 
 // ── Internal helpers ──
+
+const CANDIDATE_STATUSES = new Set<CandidateStatus>([
+  "new",
+  "parsed",
+  "screened",
+  "interview_kit_ready",
+  "decision_pending",
+  "offer",
+  "rejected",
+]);
 
 function quietConsole<T>(fn: () => T): T {
   const originalError = console.error;
@@ -85,6 +98,12 @@ function extractLinkRecordId(fields: Record<string, unknown>, fieldName: string)
   return typeof obj.id === "string" && obj.id.startsWith("rec") ? obj.id : null;
 }
 
+function extractCandidateStatus(fields: Record<string, unknown>): CandidateStatus | null {
+  const status = extractTextField(fields, "status");
+  if (!status) return null;
+  return CANDIDATE_STATUSES.has(status as CandidateStatus) ? status as CandidateStatus : null;
+}
+
 function blocked(reason: string): LiveCandidateContextBlocked {
   return { status: "blocked", safeSummary: reason, blockedReasons: [reason] };
 }
@@ -96,6 +115,7 @@ export async function readLiveCandidateContext(
   options?: ReadLiveCandidateContextOptions,
 ): Promise<LiveCandidateContextResult> {
   const requireJob = options?.requireJob ?? true;
+  const requireResume = options?.requireResume ?? true;
   const deps = options?.deps;
   const configFn = deps?.loadConfig ?? loadConfig;
   const executor = deps?.executor;
@@ -155,11 +175,12 @@ export async function readLiveCandidateContext(
   const candidateRecordId = entry.recordId;
   const candidateId = extractTextField(fields, "candidate_id") ?? `cand_live_${candidateRecordId.slice(0, 8)}`;
   const candidateDisplayName = extractTextField(fields, "display_name") ?? "未知候选人";
+  const candidateStatus = extractCandidateStatus(fields);
   const resumeText = extractTextField(fields, "resume_text");
   const jobDisplay = extractTextField(fields, "job");
   const linkedJobRecordId = extractLinkRecordId(fields, "job");
 
-  if (!resumeText) {
+  if (requireResume && !resumeText) {
     return blocked("候选人缺少简历文本，无法继续操作。");
   }
 
@@ -217,6 +238,7 @@ export async function readLiveCandidateContext(
       candidateRecordId,
       candidateId,
       candidateDisplayName,
+      candidateStatus,
       resumeText,
       jobRecordId,
       jobId,

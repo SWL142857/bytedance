@@ -54,6 +54,7 @@ function makeFullExecutor(candidateRecordId: string, resumeText: string, jobReco
             fields: {
               display_name: "Alice Candidate",
               candidate_id: "cand_test_001",
+              status: "new",
               resume_text: resumeText,
               job: [{ id: jobRecordId }],
             },
@@ -219,7 +220,7 @@ describe("live candidate context", () => {
     assert.equal(result.context.candidateRecordId, recordId);
     assert.equal(result.context.candidateId, "cand_test_001");
     assert.equal(result.context.candidateDisplayName, "Alice Candidate");
-    assert.ok(result.context.resumeText.length > 0);
+    assert.ok(result.context.resumeText!.length > 0);
     // Job fields should be null since executor returns empty jobs
     assert.equal(result.context.jobRequirements, null);
     assert.equal(result.context.jobRubric, null);
@@ -253,7 +254,8 @@ describe("live candidate context", () => {
     if (result.status !== "ok") throw new Error("expected ok");
     assert.equal(result.context.candidateRecordId, recordId);
     assert.equal(result.context.candidateId, "cand_test_001");
-    assert.ok(result.context.resumeText.length > 0);
+    assert.equal(result.context.candidateStatus, "new");
+    assert.ok(result.context.resumeText!.length > 0);
     assert.equal(result.context.jobRecordId, "rec_job_001");
     assert.equal(result.context.jobId, "job_ai_pm");
     assert.ok(result.context.jobRequirements!.length > 0);

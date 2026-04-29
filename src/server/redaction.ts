@@ -11,6 +11,10 @@ import type {
   SafeLiveCandidateWritePlan,
   SafeLiveCandidateWriteResult,
 } from "../orchestrator/live-candidate-write-runner.js";
+import type {
+  SafeLiveHumanDecisionPlan,
+  SafeLiveHumanDecisionResult,
+} from "../orchestrator/live-human-decision-runner.js";
 import type { PreApiFreezeReport } from "../orchestrator/pre-api-freeze-report.js";
 import type { LiveReadinessReport } from "../orchestrator/live-readiness-report.js";
 import type {
@@ -215,6 +219,30 @@ export function redactLiveCandidateWritePlan(
 export function redactLiveCandidateWriteResult(
   result: SafeLiveCandidateWriteResult,
 ): SafeLiveCandidateWriteResult {
+  return {
+    ...result,
+    safeSummary: redactSafeText(result.safeSummary),
+  };
+}
+
+export function redactLiveHumanDecisionPlan(
+  plan: SafeLiveHumanDecisionPlan,
+): SafeLiveHumanDecisionPlan {
+  return {
+    ...plan,
+    candidateDisplayName: sanitizeOptionalText(plan.candidateDisplayName),
+    commands: plan.commands.map((cmd) => ({
+      ...cmd,
+      description: redactSafeText(cmd.description),
+    })),
+    blockedReasons: plan.blockedReasons.map(redactSafeText),
+    safeSummary: redactSafeText(plan.safeSummary),
+  };
+}
+
+export function redactLiveHumanDecisionResult(
+  result: SafeLiveHumanDecisionResult,
+): SafeLiveHumanDecisionResult {
   return {
     ...result,
     safeSummary: redactSafeText(result.safeSummary),

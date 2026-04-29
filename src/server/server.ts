@@ -27,6 +27,12 @@ import {
   generateLiveCandidateWritePlan,
   executeLiveCandidateWrites,
 } from "../orchestrator/live-candidate-write-runner.js";
+import {
+  generateLiveHumanDecisionPlan,
+  executeLiveHumanDecision,
+  LIVE_HUMAN_DECISION_CONFIRM,
+  REVIEWED_HUMAN_DECISION_PLAN_CONFIRM,
+} from "../orchestrator/live-human-decision-runner.js";
 import { buildDemoWorkEvents } from "./work-events-demo.js";
 import { buildOperatorTasksOverview } from "./operator-tasks-demo.js";
 import {
@@ -44,6 +50,8 @@ import {
   redactLiveReadiness,
   redactLiveCandidateWritePlan,
   redactLiveCandidateWriteResult,
+  redactLiveHumanDecisionPlan,
+  redactLiveHumanDecisionResult,
   redactWorkEvents,
 } from "./redaction.js";
 import type { OrgOverviewAgentView, OrgOverviewView } from "../types/work-event.js";
@@ -405,6 +413,118 @@ async function handleApi(
         planNonce: (body.planNonce as string) ?? "",
       });
       jsonResponse(res, redactLiveCandidateWriteResult(result));
+      return;
+    }
+
+    // ── Phase 7.7: Live Human Decision (Two-Step) ──
+
+    const humanDecisionPlanMatch = /^\/api\/live\/candidates\/(lnk_live_[a-z0-9]+)\/generate-human-decision-plan$/.exec(url.pathname);
+    if (humanDecisionPlanMatch && humanDecisionPlanMatch[1] && req.method === "POST") {
+      if (!isLocalRequest(req)) {
+        errorResponse(res, 403, "仅允许本地访问");
+        return;
+      }
+      if (!requireJsonContentType(req, res)) {
+        return;
+      }
+      const linkId = humanDecisionPlanMatch[1];
+
+      let body: Record<string, unknown>;
+      try {
+        body = await parseJsonBody(req);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "";
+        if (msg.includes("too large")) {
+          errorResponse(res, 413, "请求体过大");
+        } else {
+          errorResponse(res, 400, "请求格式错误");
+        }
+        return;
+      }
+
+      const decision = body.decision;
+      const decidedBy = body.decidedBy;
+      const decisionNote = body.decisionNote;
+      if (decision !== "offer" && decision !== "rejected") {
+        errorResponse(res, 400, "decision 必须是 offer 或 rejected");
+        return;
+      }
+      if (typeof decidedBy !== "string" || !decidedBy.trim()) {
+        errorResponse(res, 400, "decidedBy 不能为空");
+        return;
+      }
+      if (typeof decisionNote !== "string" || !decisionNote.trim()) {
+        errorResponse(res, 400, "decisionNote 不能为空");
+        return;
+      }
+
+      const plan = await generateLiveHumanDecisionPlan(linkId, {
+        decision,
+        decidedBy,
+        decisionNote,
+      });
+      jsonResponse(res, redactLiveHumanDecisionPlan(plan));
+      return;
+    }
+
+    const humanDecisionExecMatch = /^\/api\/live\/candidates\/(lnk_live_[a-z0-9]+)\/execute-human-decision$/.exec(url.pathname);
+    if (humanDecisionExecMatch && humanDecisionExecMatch[1] && req.method === "POST") {
+      if (!isLocalRequest(req)) {
+        errorResponse(res, 403, "仅允许本地访问");
+        return;
+      }
+      if (!requireJsonContentType(req, res)) {
+        return;
+      }
+      const linkId = humanDecisionExecMatch[1];
+
+      let body: Record<string, unknown>;
+      try {
+        body = await parseJsonBody(req);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "";
+        if (msg.includes("too large")) {
+          errorResponse(res, 413, "请求体过大");
+        } else {
+          errorResponse(res, 400, "请求格式错误");
+        }
+        return;
+      }
+
+      if (body.confirm !== LIVE_HUMAN_DECISION_CONFIRM) {
+        errorResponse(res, 403, "确认短语错误，拒绝执行。");
+        return;
+      }
+      if (body.reviewConfirm !== REVIEWED_HUMAN_DECISION_PLAN_CONFIRM) {
+        errorResponse(res, 403, "审阅确认短语错误，请先审阅决策计划。");
+        return;
+      }
+
+      const decision = body.decision;
+      const decidedBy = body.decidedBy;
+      const decisionNote = body.decisionNote;
+      if (decision !== "offer" && decision !== "rejected") {
+        errorResponse(res, 400, "decision 必须是 offer 或 rejected");
+        return;
+      }
+      if (typeof decidedBy !== "string" || !decidedBy.trim()) {
+        errorResponse(res, 400, "decidedBy 不能为空");
+        return;
+      }
+      if (typeof decisionNote !== "string" || !decisionNote.trim()) {
+        errorResponse(res, 400, "decisionNote 不能为空");
+        return;
+      }
+
+      const result = await executeLiveHumanDecision(linkId, {
+        confirm: body.confirm as string,
+        reviewConfirm: body.reviewConfirm as string,
+        planNonce: (body.planNonce as string) ?? "",
+        decision,
+        decidedBy,
+        decisionNote,
+      });
+      jsonResponse(res, redactLiveHumanDecisionResult(result));
       return;
     }
 

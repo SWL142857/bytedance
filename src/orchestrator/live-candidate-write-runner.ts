@@ -206,7 +206,7 @@ async function runPipelineForCandidate(
     jobRecordId: jobRecordId!,
     candidateId,
     jobId: jobId!,
-    resumeText,
+    resumeText: resumeText!,
     jobRequirements: jobRequirements!,
     jobRubric: jobRubric!,
   };

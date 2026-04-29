@@ -13,7 +13,7 @@
 
 ## Current Gap Assessment
 
-截至 2026-04-29，本地/demo 版已 100% 跑通；真实飞书端到端约 65%-70% 完成。
+截至 2026-04-29，本地/demo 版已 100% 跑通；真实飞书端到端约 80%-85% 完成，剩余主缺口是 live analytics report。
 
 | 步骤 | 当前状态 | 还差什么 |
 |------|----------|----------|
@@ -21,7 +21,7 @@
 | 2. 初始化 8 张表 | `pnpm base:plan` 可生成 89 条命令，0 unsupported fields | 已完成：`pnpm base:bootstrap:execute` 可在真实空 Base 上初始化 |
 | 3. 写入示例岗位和候选人 | `pnpm base:seed:dry-run` 可生成 91 条命令 | 已完成：bootstrap 自动关联 job link；candidate.job 使用真实 `rec_xxx` |
 | 4. 触发 pipeline | 本地完整；live candidate 写回到 `decision_pending` 已具备 | 需要真实飞书 smoke；当前 live write 使用 deterministic pipeline |
-| 5. 人类最终决策 | 本地 `Human Decision` 有，旧 live MVP runner 有 demo 形态 | 新 live candidate flow 还缺独立 guarded human decision runner/route |
+| 5. 人类最终决策 | 本地 `Human Decision` 有，旧 live MVP runner 有 demo 形态 | 已完成：`generateLiveHumanDecisionPlan` + `executeLiveHumanDecision`，双确认 + TOCTOU guard |
 | 6. Analytics 周报 | 本地 Analytics 有，旧 live MVP plan 有 demo 形态 | 还缺从真实 Base 聚合数据并写 Reports 的 live analytics runner |
 
 ## Recommended Next Phases
@@ -52,14 +52,17 @@
 
 目标：补齐 `decision_pending -> offer/rejected` 的真实人类确认写回。
 
-范围：
+状态：完成（2026-04-29）。
 
-- 新增 `generateLiveHumanDecisionPlan(linkId, decisionInput)`。
-- 新增 `executeLiveHumanDecision(linkId, options)`。
-- 只允许候选人当前状态为 `decision_pending`。
-- 只允许 `offer` 或 `rejected`，actor 必须是 `human_confirm`。
-- 要求独立确认短语，例如 `EXECUTE_LIVE_HUMAN_DECISION`。
-- 写入 Candidates human decision fields、status update、Agent Runs 或 Work Events 安全审计。
+实现：
+
+- `src/orchestrator/live-human-decision-runner.ts`：封装 `generateLiveHumanDecisionPlan()` 和 `executeLiveHumanDecision()`，复用 `buildHumanDecisionPlan()`。
+- 两步执行：生成计划返回 planNonce → 执行时要求双确认 + planNonce TOCTOU 校验 + 重读候选人数据。
+- 确认短语：`EXECUTE_LIVE_HUMAN_DECISION` + `REVIEWED_HUMAN_DECISION_PLAN`。
+- `readLiveCandidateContext()` 新增 `requireResume` 选项，human decision 不因缺简历 blocked。
+- Redaction：`redactLiveHumanDecisionPlan()` 和 `redactLiveHumanDecisionResult()`。
+- Server routes：`POST generate-human-decision-plan` 和 `POST execute-human-decision`。
+- 新增 20+ 测试覆盖 runner 和 route 层。
 
 验收：
 

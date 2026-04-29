@@ -22,7 +22,7 @@
 - `requireJsonContentType()` 精确解析 media type，只接受 `application/json`。
 - `parseJsonBody()` 限制 4KB，非法 JSON 或非对象 JSON 返回 400。
 
-当前 live POST route 都保持 loopback guard。Provider demo 和 execute-writes 还要求 JSON content-type 和 body cap。
+当前 live POST route 都保持 loopback guard。Provider demo、execute-writes 和 human decision 还要求 JSON content-type 和 body cap。
 
 ## Provider Boundaries
 
@@ -53,6 +53,14 @@ Live candidate write scope 当前只允许：
 - Agent Runs
 
 Reports 不在 Phase 7.0 live candidate write scope 内；Analytics report 需要后续 dedicated live analytics runner。
+
+Human decision 是独立 guarded runner（Phase 7.7），只允许：
+
+- `decision_pending -> offer` 或 `decision_pending -> rejected`
+- 只写同一个 Candidates record 的 `human_decision*` 字段和 `status`
+- Actor 必须是 `human_confirm`
+- 双确认 + planNonce TOCTOU guard
+- Agent 不能触发 offer/rejected
 
 ## Redaction Rules
 
