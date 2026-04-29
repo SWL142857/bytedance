@@ -69,6 +69,13 @@ new → parsed → screened → interview_kit_ready → decision_pending → off
 | Phase 6.6 | 完成 | 真实 forbidden trace scanner 已接入 release gate、API boundary audit 和 server report；`pnpm scan:forbidden-traces` 当前 0 findings |
 | Phase 6.7 | 完成 | 飞书实时只读 + 安全跳转：`GET /api/live/base-status`、`GET /api/live/records?table=`、`/go/lnk_live_*` 302 到飞书 Base/对应表格页面；`HIRELOOP_ALLOW_LARK_READ=1` 独立只读开关；前端展示候选人/岗位实时数据与"打开飞书"按钮 |
 | Phase 6.8 | 完成 | 前端候选人卡片可点击运行 deterministic Agent 预演，服务端只读解析真实候选人/岗位数据，写入本地安全 runtime snapshot；不写飞书、不外呼模型 |
+| Phase 6.9 | 完成 | Live Provider Agent Preview：`POST /api/live/candidates/:linkId/run-provider-agent-demo`，需要 confirm 后才对真实候选人跑 provider Resume Parser，不写 Base |
+| Phase 7.0 | 完成 | Live candidate 两步写回：`generate-write-plan` 生成只读计划，`execute-writes` 需要 confirm + reviewConfirm + planNonce；仅允许写候选人主链路产物，不做 offer/rejected |
+| Phase 7.1a | 完成 | 抽出 `readLiveCandidateContext()`，统一 live candidate/job 读取、blocked 路径和 deps 类型，dry-run / provider preview / write plan 共用同一上下文管道 |
+| Phase 7.1 | 完成 | 前端 operator workspace 拆成 ES modules，候选人 detail panel 按 Profile / Dry-run / Provider preview / Write plan summary 分区；仍不暴露 execute-writes |
+| Phase 7.3 | 完成 | `AgentInputBundle` + `RetrievedEvidence[]` 外部输入契约、JSON/JSONL loader、evidence pool + mapping、snippet 清洗和 `CandidatePipelineInput` 单向 adapter |
+| Phase 7.4 | 完成 | RAG-aware dataset verification report：coverage、schema errors、redaction blocked、provider blocked、evidence usage 与安全 summary；当前只验证，不接真实 retriever |
+| Phase 7.5 | 完成 | Server/orchestrator hardening：请求 guard 抽到 `request-guards.ts`，loopback/content-type/body cap/non-object JSON 防护和 write/RAG 边界测试补齐 |
 
 当前开发重点：
 
@@ -76,11 +83,10 @@ new → parsed → screened → interview_kit_ready → decision_pending → off
 |------|------|------|
 | Phase 6.1 — Work Events 与飞书工作台集成 | 安全骨架完成 | Work Events 类型与 Base schema、demo fixture、统一 redaction、`/api/work-events` / `/api/org/overview` / `/go/:linkId` 安全骨架、UI 首页组织运行总览与最近活动；当前仍未启用真实飞书跳转或 Live Work Events 写入，但本地 UI 已可优先读取安全 runtime snapshot 展示真实 agent 运行结果 |
 | Phase 6.2 — 操作员控制台 | 类型与只读任务清单已就绪 | `src/types/operator-task.ts`、`src/server/operator-tasks-demo.ts` 与 `GET /api/operator/tasks` 已落地，仅返回安全的只读任务清单（每个任务 `execute_enabled=false`），尚未提供任何 execute / spawn 入口；真实执行需要后续阶段开放并经人工确认 |
-| Phase 6.3 — 数据伙伴接口契约 | 待定 | 与数据/RAG 侧对齐 `JobContext`、`CandidateProfile`、`RetrievedEvidence[]`、`AgentInputBundle` 等接口，先 mock 后替换 |
+| Phase 6.3 / 7.3 — 数据伙伴接口契约 | 契约层完成 | 外部数据以 `AgentInputBundle` 进入，loader 支持内嵌 evidence 或 evidence pool + mapping；真实数据集和 retriever 接入后再继续 RAG 业务集成 |
 | Phase 6.5 — Provider dataset execute verification | 本地待验收 | `pnpm provider:dataset-verify` 已接入本地脚本入口，范围仅 provider 模型执行验证 + 本地 runtime snapshot，不做 Base 写入；blocked 时不 fallback deterministic |
-| Phase 6.8 — 从前端点击运行 Agent Dry-run | 完成 | `POST /api/live/candidates/:linkId/run-dry-run`，从 UI 选真实飞书候选人跑 deterministic pipeline，不写飞书、不外呼模型 |
-| Phase 6.9 — Provider Agent Preview | 完成 | `POST /api/live/candidates/:linkId/run-provider-agent-demo`，Confirm 确认后调用外部模型对真实候选人跑 Resume Parser，不写 Base |
-| Phase 7.0 — 人工确认写回飞书 | 完成 | `POST .../generate-write-plan` → `POST .../execute-writes` 双确认（EXECUTE + REVIEWED），仅推进到 decision_pending，不做 offer/rejected |
+| RAG retriever 接入 | 暂缓到数据接入后 | Phase 7.3/7.4 已准备契约和验证报告；等队友提供数据集、evidence 更新频率和 retriever 形态后，再决定 evidence 是否进入 prompt、是否纳入 planNonce |
+| Phase 7.2 — 写回 UI | 暂缓 | API 写回能力已具备，但 UI 执行写入需要独立安全交互设计；当前前端只允许生成 write plan summary，不提供 execute-writes 按钮 |
 
 Phase 6.0 的最低验收边界（已完成）：
 
@@ -258,9 +264,94 @@ export FEISHU_WORK_EVENTS_WEB_URL=<Work Events 表格页面 URL>
 
 **UI：** 飞书实时数据的候选人卡片新增"运行 Agent 预演"按钮；点击后 POST、显示 loading、成功/失败/blocked 状态提示；快照写入后自动刷新流水线和组织总览。
 
-**下一步（计划中）：**
-- Phase 7.0：人工确认写回飞书
-- Phase 7.0：两步写回飞书（生成 write plan → 双确认执行），仅推进状态，不做 offer/rejected
+### Provider Agent Preview（Phase 6.9）
+
+**API：** `POST /api/live/candidates/:linkId/run-provider-agent-demo`
+- linkId 必须来自 live link registry，且必须是候选人记录。
+- HTTP route 和 runner 内部都要求 `confirm === "EXECUTE_PROVIDER_AGENT_DEMO"`。
+- 服务端只读取候选人简历，调用 provider-backed Resume Parser demo；不读取岗位评分标准，不写 Base。
+- 返回 `ProviderAgentDemoResult` 的安全投影；blocked 路径包括 link 不存在、Base 未就绪、缺简历、confirm 不匹配、provider 配置不可用。
+
+**安全约束：**
+- route 仅接受 loopback request，并要求 `Content-Type: application/json`。
+- 请求体最大 4KB；非对象 JSON 会返回 `400 请求格式错误`。
+- 响应不含 record ID、resume text、prompt、payload、endpoint、modelId、apiKey、stdout/stderr 或 stack trace。
+
+### Live Candidate 写回（Phase 7.0）
+
+**两步 API：**
+- `POST /api/live/candidates/:linkId/generate-write-plan`：只读生成写回计划摘要。
+- `POST /api/live/candidates/:linkId/execute-writes`：按计划执行写回，需要双确认和 nonce。
+
+`generateLiveCandidateWritePlan()` 会重新读取真实候选人和关联岗位，跑 deterministic pipeline，生成只读 `SafeLiveCandidateWritePlan`。计划只展示 `commandCount`、`commands[].description`、`targetTable`、`action` 和 `planNonce`，不暴露 raw args、record ID 或 token。
+
+`executeLiveCandidateWrites()` 必须同时满足：
+- `confirm === "EXECUTE_LIVE_CANDIDATE_WRITES"`
+- `reviewConfirm === "REVIEWED_DECISION_PENDING_WRITE_PLAN"`
+- 提交的 `planNonce` 与重新计算结果一致
+- `HIRELOOP_ALLOW_LARK_WRITE=1`
+- write scope 只包含允许表：Candidates、Resume Facts、Evaluations、Interview Kits、Agent Runs
+- 不产生 `offer` / `rejected` 状态写入
+
+执行时会重新跑 pipeline 并复算 nonce，防止 generate 和 execute 之间数据变化。写命令顺序执行，遇到第一条失败即停止，返回安全计数和 stop index。
+
+### Operator Workspace 与上下文抽取（Phase 7.1a / 7.1）
+
+`readLiveCandidateContext(linkId, options)` 统一了 live candidate/job 读取逻辑：
+- `requireJob: false`：只要求候选人和简历，供 provider preview 使用。
+- `requireJob: true`：同时要求岗位要求和评分标准，供 dry-run 和 write plan 使用。
+- link 不存在、Base blocked、候选人读取失败、缺简历、缺岗位字段等 blocked 路径集中在 context 层。
+
+前端已从单文件拆成 ES modules，入口仍为无构建步骤的 vanilla JS。候选人 detail panel 按四个区域展示：
+- Feishu safe profile
+- deterministic dry-run
+- provider preview
+- write plan summary
+
+当前 UI 可以生成 write plan summary，但不暴露 `/execute-writes`，也不包含 `EXECUTE_LIVE_CANDIDATE_WRITES`。写回 UI 暂缓，后续只有在非开发者 operator 确实需要从 UI 执行写回时再单独设计安全交互。
+
+### RAG 输入契约与验证（Phase 7.3 / 7.4）
+
+当前 RAG 只完成了数据契约、loader 和验证报告，不接真实 retriever，也不把 evidence 拼进 prompt。
+
+`AgentInputBundle` 是外部数据/RAG 层进入系统的契约：
+- `candidate: CandidateProfile`
+- `job: JobContext`
+- `evidence: RetrievedEvidence[]`
+- `provenance`：包含 evidence 来源、hash 和生成时间
+- `runMode`
+- `guardFlags`
+
+`loadAgentInputBundles()` 支持 JSON array / JSONL、候选人内嵌 evidence、以及 `evidencePool + evidenceIds` 的 envelope 格式。`sourceRef` 只允许 `dataset:`、`note:`、`base:` 前缀；snippet 会做敏感模式扫描，命中则 blocked 并置空，超过 500 字符则截断。
+
+`agentInputBundleToPipelineInput()` 是单向 adapter：Pipeline 内部继续使用 `CandidatePipelineInput`，evidence 默认不进入 `resumeText` / `jobRequirements` / `jobRubric`。
+
+`verifyBundles()` 输出 `RagDatasetVerificationReport`：
+- `status: "passed" | "needs_review" | "failed"`
+- `totalCandidates` / `completed` / `failed`
+- `evidenceCoverage`
+- `redactionBlockedCount`
+- `schemaErrors`
+- `providerBlockedCount`
+- `evidenceUsage`
+- `guardrailSummary`
+- `safeSummary`
+
+后续等队友接入真实数据集和 RAG 后，再决定 evidence 更新频率、是否纳入 `planNonce`、哪些 evidence 可以进入哪些 agent 的 prompt。
+
+### Server / Orchestrator Hardening（Phase 7.5）
+
+请求边界已集中到 `src/server/request-guards.ts`：
+- `isLocalRequest()` 使用 `req.socket.remoteAddress`，只接受 `127.0.0.1`、`::1`、`::ffff:127.0.0.1`。
+- `requireJsonContentType()` 精确解析 media type，只接受 `application/json`。
+- `parseJsonBody()` 保持 4KB body cap，不 destroy socket；超限返回 413，非法或非对象 JSON 返回 400。
+
+当前所有 live POST route 都保持 loopback guard；带 body 的执行 route 保持 content-type、body cap、confirm boundary 和安全中文错误消息。RAG verification report 的 schema field 输出也经过白名单，未知字段统一映射为 `unknown`。
+
+**后续计划：**
+- 先等队友把数据集和 RAG 接入形式明确下来，再继续 RAG retriever integration。
+- RAG 接入时优先保持 evidence 不进 prompt，只进入 snapshot/UI/verification；如要进入 agent prompt，需要单独审查 redaction、coverage 和 nonce 影响。
+- 写回 UI 继续暂缓；当前只保留 read-only plan summary，避免在 evidence 格式未稳定前设计错误的执行入口。
 
 ## 模型 API 本地配置
 
@@ -304,9 +395,9 @@ src/
   agents/         — Agent 输出 schema 和校验
   base/           — 飞书 Base 表结构常量定义（含 Work Events 表）
   llm/            — deterministic client、provider adapter/client 和 guarded provider runners
-  runtime/        — 外部 JSON 输入装载与本地 agent 运行辅助
-  server/         — 安全本地 UI service layer、redaction、live base service 与 link registry
-  ui/             — 静态前端 shell（含组织运行总览、最近活动、飞书实时数据）
+  runtime/        — 外部 JSON / dataset / AgentInputBundle 装载、RAG dataset verification 与本地 agent 运行辅助
+  server/         — 安全本地 UI service layer、request guards、redaction、live base service 与 link registry
+  ui/             — 静态前端 shell（ES modules，含组织运行总览、最近活动、飞书实时数据与候选人 detail panel）
 tests/            — 纯逻辑测试
 ```
 
@@ -364,6 +455,47 @@ tests/scripts/run-provider-dataset-verify.test.ts — provider dataset verificat
 src/types/operator-task.ts             — OperatorTask 与 SafeOperatorTaskView 类型
 src/server/operator-tasks-demo.ts      — 只读任务清单 demo（execute_enabled=false）
 tests/server/operator-tasks.test.ts    — /api/operator/tasks 只读 + 安全测试
+```
+
+新增文件（Phase 7.0 / 7.1a）：
+
+```text
+src/orchestrator/live-candidate-context.ts        — live candidate/job 统一读取上下文，支持 requireJob 模式
+src/orchestrator/live-candidate-write-runner.ts   — 两步写回：generate plan + double-confirm execute
+tests/orchestrator/live-candidate-context.test.ts — context blocked/happy path 与 requireJob 测试
+tests/orchestrator/live-candidate-write-runner.test.ts — write plan、nonce、scope、double-confirm 测试
+```
+
+新增文件（Phase 7.1）：
+
+```text
+src/ui/app.js                — ES module 入口、加载和全局 reload hook
+src/ui/constants.js          — UI label、icon、status 字典
+src/ui/helpers.js            — fetch、escape、badge、时间和布局 helper
+src/ui/safety-badge.js       — data source / safety summary 共享渲染
+src/ui/drawer.js             — detail drawer / intro overlay / focus trap
+src/ui/work-events.js        — 最近活动与安全链接渲染
+src/ui/pipeline.js           — hero、组织总览、pipeline 渲染
+src/ui/operator-tasks.js     — operator task 面板
+src/ui/reports.js            — release gate / audit 等报告渲染
+src/ui/live-records.js       — live candidates/jobs 列表与选择
+src/ui/candidate-detail.js   — 候选人四区 detail panel
+```
+
+新增文件（Phase 7.3 / 7.4）：
+
+```text
+src/runtime/bundle-loader.ts                 — AgentInputBundle 类型、JSON/JSONL loader、evidence 清洗、adapter
+src/runtime/rag-dataset-verification.ts      — RAG dataset verification report 与 evidence usage mapping
+tests/runtime/bundle-loader.test.ts          — bundle loader、evidence pool/mapping、redaction、adapter 测试
+tests/runtime/rag-dataset-verification.test.ts — verification report、coverage、schema、安全输出测试
+```
+
+新增文件（Phase 7.5）：
+
+```text
+src/server/request-guards.ts              — loopback、content-type、4KB body cap、JSON body guard
+tests/server/request-guards.test.ts       — loopback address guard 测试
 ```
 
 ## 开发
