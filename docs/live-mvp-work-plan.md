@@ -18,8 +18,8 @@
 | 步骤 | 当前状态 | 还差什么 |
 |------|----------|----------|
 | 1. 配置飞书凭据和 Base token | 基础能力已具备 | 需要真实 env、`lark-cli auth`、权限确认 |
-| 2. 初始化 8 张表 | `pnpm base:plan` 可生成 89 条命令，0 unsupported fields | 需要在真实空 Base 上跑一次；最好补幂等检查 |
-| 3. 写入示例岗位和候选人 | `pnpm base:seed:dry-run` 可生成 91 条命令 | candidate seed 还没有自动关联 job link；真实 pipeline 需要岗位字段可解析 |
+| 2. 初始化 8 张表 | `pnpm base:plan` 可生成 89 条命令，0 unsupported fields | 已完成：`pnpm base:bootstrap:execute` 可在真实空 Base 上初始化 |
+| 3. 写入示例岗位和候选人 | `pnpm base:seed:dry-run` 可生成 91 条命令 | 已完成：bootstrap 自动关联 job link；candidate.job 使用真实 `rec_xxx` |
 | 4. 触发 pipeline | 本地完整；live candidate 写回到 `decision_pending` 已具备 | 需要真实飞书 smoke；当前 live write 使用 deterministic pipeline |
 | 5. 人类最终决策 | 本地 `Human Decision` 有，旧 live MVP runner 有 demo 形态 | 新 live candidate flow 还缺独立 guarded human decision runner/route |
 | 6. Analytics 周报 | 本地 Analytics 有，旧 live MVP plan 有 demo 形态 | 还缺从真实 Base 聚合数据并写 Reports 的 live analytics runner |
@@ -30,18 +30,23 @@
 
 目标：把 Base 初始化和 demo seed 从 dry-run 推到可验证的真实飞书流程。
 
-范围：
+状态：完成（2026-04-29）。
 
-- 增加 bootstrap preflight：确认目标 Base 可访问、当前表状态、是否为空或是否允许重复建表。
-- 为 `base:seed` 增加 job link 自动关联：先创建/解析 Jobs，拿到 `rec_xxx` 后写入 Candidates.job。
-- 输出安全 bootstrap report：created/skipped/failed 计数，不输出 token、record ID、raw stdout。
-- 保持 `HIRELOOP_ALLOW_LARK_WRITE=1` 守卫。
+实现：
+
+- `src/base/live-bootstrap.ts`：封装 preflight、setup、seed（含 job link 自动关联）、安全 report。
+- `scripts/bootstrap-live-base.ts`：CLI 入口，`--execute` 为真实执行，否则 dry-run。
+- `pnpm base:bootstrap:dry-run` / `pnpm base:bootstrap:execute`。
+- Preflight 检查所有 8 张表状态，非空表或无法确认表状态时 fail closed，不误删已有数据。
+- Demo seed 先创建 Jobs 记录，解析返回的 `rec_xxx`，再写入 Candidates 并关联 job link。
+- 输出不包含 `rec_`、token、raw stdout/stderr、payload、command args。
+- 新增 30+ 测试覆盖 dry-run 安全、execute blocked、fail-closed、job link 解析、redaction。
 
 验收：
 
 - 空 Base 上可以初始化 8 张表并写入 1 个 job + 1 个 candidate。
 - 初始化后 `GET /api/live/records?table=candidates` 能显示候选人，且 `run-dry-run` 不因缺岗位要求或 rubric blocked。
-- 重跑 bootstrap 不会误删或覆盖已有业务数据；如果暂不做幂等，则必须 fail closed 并提示人工确认。
+- 重跑 bootstrap 不会误删或覆盖已有业务数据；非空表 fail closed 并提示人工确认。
 
 ### Phase 7.7 — Live Human Decision Runner
 

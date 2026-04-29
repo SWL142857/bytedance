@@ -54,6 +54,37 @@ pnpm base:seed:execute
 
 注意：真实执行前需要确认目标 Base 是空 Base 或可接受重复建表风险。当前 bootstrap 还不是幂等迁移器。
 
+## Live Bootstrap（推荐）
+
+bootstrap 命令会自动完成建表 + demo seed（含 job link 关联），比手动分步执行更可靠：
+
+```bash
+# dry-run：检查飞书配置和 Base 状态，显示将要执行的操作
+pnpm base:bootstrap:dry-run
+
+# 真实执行：初始化 8 张表 + 写入 demo job + demo candidate（含 job link）
+export LARK_APP_ID=<飞书应用 ID>
+export LARK_APP_SECRET=<飞书应用密钥>
+export BASE_APP_TOKEN=<Base 应用凭证>
+export HIRELOOP_ALLOW_LARK_READ=1
+export HIRELOOP_ALLOW_LARK_WRITE=1
+
+pnpm base:bootstrap:execute
+```
+
+bootstrap preflight 会检查：
+
+- 飞书配置完整性。
+- 目标 Base 可访问性。
+- 已有表状态：如果任何表有业务数据，自动阻断，不删除或覆盖。
+- 表状态读取结果：如果读取失败且无法确认为“表不存在”，自动阻断。
+
+安全约束：
+
+- 所有输出不包含 `rec_` record ID、token、raw stdout/stderr、payload。
+- 缺少 `HIRELOOP_ALLOW_LARK_WRITE=1` 时阻断执行。
+- 非空 Base 时 fail closed，需人工确认后手动清空再重试。
+
 ## Live Read-Only
 
 ```bash
@@ -170,6 +201,7 @@ pnpm ui:dev
 ```bash
 pnpm base:plan
 pnpm base:seed:dry-run
+pnpm base:bootstrap:dry-run
 pnpm ui:dev
 ```
 
