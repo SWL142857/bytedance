@@ -21,7 +21,14 @@ Thumbs.db
 
 # Local development-only notes
 ?LAUDE.md
-docs/
+docs/*
+!docs/
+!docs/architecture.md
+!docs/phase-status.md
+!docs/operations-runbook.md
+!docs/security-boundaries.md
+!docs/live-mvp-work-plan.md
+!docs/rag-contract.md
 
 # Logs
 *.log
