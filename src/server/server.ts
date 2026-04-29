@@ -1,6 +1,13 @@
 import http from "node:http";
 import { readFileSync, existsSync } from "node:fs";
 import { extname, resolve, sep } from "node:path";
+import {
+  isLocalRequest,
+  requireJsonContentType,
+  parseJsonBody,
+} from "./request-guards.js";
+
+export { isLoopbackAddress } from "./request-guards.js";
 import { DeterministicLlmClient } from "../llm/deterministic-client.js";
 import { runCandidatePipeline } from "../orchestrator/candidate-pipeline.js";
 import { buildMvpReleaseGateReport } from "../orchestrator/mvp-release-gate.js";
@@ -68,54 +75,6 @@ function jsonResponse(res: http.ServerResponse, data: unknown): void {
 function errorResponse(res: http.ServerResponse, status: number, message: string): void {
   res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
   res.end(JSON.stringify({ error: message }));
-}
-
-const LOOPBACK_RANGES = ["127.0.0.1", "::1", "::ffff:127.0.0.1"];
-
-export function isLoopbackAddress(remoteAddress: string | undefined): boolean {
-  return LOOPBACK_RANGES.includes(remoteAddress ?? "");
-}
-
-function isLocalRequest(req: http.IncomingMessage): boolean {
-  return isLoopbackAddress(req.socket.remoteAddress);
-}
-
-function requireJsonContentType(req: http.IncomingMessage, res: http.ServerResponse): boolean {
-  const raw = req.headers["content-type"] ?? "";
-  const mediaType = raw.split(";")[0]?.trim().toLowerCase() ?? "";
-  if (mediaType !== "application/json") {
-    errorResponse(res, 415, "不支持的媒体类型");
-    return false;
-  }
-  return true;
-}
-
-const MAX_BODY_BYTES = 4096;
-
-function parseJsonBody(req: http.IncomingMessage): Promise<Record<string, unknown>> {
-  return new Promise((resolve, reject) => {
-    let body = "";
-    let size = 0;
-    let overflowed = false;
-    req.on("data", (chunk: Buffer) => {
-      if (overflowed) return;
-      size += chunk.length;
-      if (size > MAX_BODY_BYTES) {
-        overflowed = true;
-        reject(new Error("Request body too large"));
-        return;
-      }
-      body += chunk.toString();
-    });
-    req.on("end", () => {
-      try {
-        resolve(JSON.parse(body) as Record<string, unknown>);
-      } catch {
-        reject(new Error("Invalid JSON body"));
-      }
-    });
-    req.on("error", reject);
-  });
 }
 
 function serveStatic(req: http.IncomingMessage, res: http.ServerResponse): boolean {

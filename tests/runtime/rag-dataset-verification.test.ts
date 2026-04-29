@@ -286,6 +286,38 @@ describe("rag-dataset-verification — safety", () => {
     assert.ok(!json.includes("/tmp/"), "Must not contain file paths");
     assert.ok(!json.includes("/Users/"), "Must not contain file paths");
   });
+
+  it("malicious schema error field names are mapped to unknown", () => {
+    // Simulate a result with errors containing unsafe field names
+    const result = loadAgentInputBundles({
+      inputJson: JSON.stringify([
+        makeValidEntry(),
+        { candidate: { candidateId: "c2", resumeText: "R2" } },  // missing candidateRecordId
+      ]),
+    });
+    const report = verifyBundles(result);
+    // Schema errors should only contain whitelisted field names or "unknown"
+    for (const se of report.schemaErrors) {
+      assert.ok(
+        se.field === "unknown" || [
+          "candidate", "candidateRecordId", "candidateId", "resumeText",
+          "job", "jobRecordId", "jobId", "requirements", "rubric",
+          "evidence", "sourceRef", "kind", "usedFor", "snippet", "score",
+        ].includes(se.field),
+        `schemaErrors.field must be safe, got: "${se.field}"`,
+      );
+    }
+  });
+
+  it("report JSON does not contain EXECUTE tokens or write paths", () => {
+    const result = loadAgentInputBundles({
+      inputJson: JSON.stringify([makeValidEntry()]),
+    });
+    const report = verifyBundles(result);
+    const json = JSON.stringify(report);
+    assert.ok(!json.includes("EXECUTE_LIVE"), "Must not contain execute tokens");
+    assert.ok(!json.includes("execute-writes"), "Must not contain write paths");
+  });
 });
 
 // ═══════════════════════════════════════════════════

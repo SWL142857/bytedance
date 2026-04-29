@@ -243,6 +243,17 @@ describe("server API routes", () => {
     assert.equal(data.error, "请求体过大");
   });
 
+  it("POST /api/live/candidates/:linkId/run-provider-agent-demo rejects non-object JSON body", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/candidates/lnk_live_test123/run-provider-agent-demo`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "null",
+    });
+    assert.equal(res.status, 400);
+    const data = await res.json() as { error: string };
+    assert.equal(data.error, "请求格式错误");
+  });
+
   it("POST /api/live/candidates/:linkId/run-provider-agent-demo with invalid link returns blocked", async () => {
     const res = await fetch(`${BASE_URL}/api/live/candidates/lnk_live_nonexistent/run-provider-agent-demo`, {
       method: "POST",
@@ -373,6 +384,17 @@ describe("server API routes", () => {
       body: JSON.stringify({ ...WRITE_BODY, filler: "x".repeat(5000) }),
     });
     assert.equal(res.status, 413);
+  });
+
+  it("POST /api/live/candidates/:linkId/execute-writes rejects non-object JSON body", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/candidates/lnk_live_test123/execute-writes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "null",
+    });
+    assert.equal(res.status, 400);
+    const data = await res.json() as { error: string };
+    assert.equal(data.error, "请求格式错误");
   });
 
   it("POST /api/live/candidates/:linkId/execute-writes with double confirm but invalid link returns blocked", async () => {

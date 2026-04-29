@@ -154,4 +154,65 @@ describe("live candidate write runner", () => {
     assert.equal(result.executed, false);
     assert.equal(readCalled, false);
   });
+
+  it("blocks on unknown link with correct double confirm", async () => {
+    let readCalled = false;
+    const result = await executeLiveCandidateWrites("lnk_live_unknown_expired", {
+      confirm: LIVE_CANDIDATE_WRITE_CONFIRM,
+      reviewConfirm: "REVIEWED_DECISION_PENDING_WRITE_PLAN",
+      planNonce: "abc123",
+      deps: {
+        loadConfig: () => READY_READ_CONFIG,
+        cliAvailable: () => true,
+        executor: () => {
+          readCalled = true;
+          return { description: "", status: "failed", stdout: null, stderr: null, exitCode: 1, durationMs: 0 };
+        },
+      },
+    });
+
+    assert.equal(result.status, "blocked");
+    assert.equal(result.executed, false);
+    assert.equal(readCalled, false, "Executor should not be called for unknown link");
+  });
+
+  it("blocks with invalid planNonce on known link", async () => {
+    const linkId = registerCandidate("rec_nonce_mismatch");
+    const result = await executeLiveCandidateWrites(linkId, {
+      confirm: LIVE_CANDIDATE_WRITE_CONFIRM,
+      reviewConfirm: "REVIEWED_DECISION_PENDING_WRITE_PLAN",
+      planNonce: "ffffffffffffffff",
+      deps: {
+        loadConfig: () => READY_READ_CONFIG,
+        cliAvailable: () => true,
+        executor: makeReadExecutor("rec_nonce_mismatch", "Resume text for nonce test."),
+      },
+    });
+
+    assert.equal(result.status, "blocked");
+    assert.equal(result.executed, false);
+    assert.ok(result.safeSummary.includes("planNonce"), "Must mention planNonce mismatch");
+  });
+
+  it("blocks before read when reviewConfirm is wrong", async () => {
+    const linkId = registerCandidate("rec_wrong_review");
+    let readCalled = false;
+    const result = await executeLiveCandidateWrites(linkId, {
+      confirm: LIVE_CANDIDATE_WRITE_CONFIRM,
+      reviewConfirm: "wrong_review_confirm",
+      planNonce: "abc123",
+      deps: {
+        loadConfig: () => READY_READ_CONFIG,
+        cliAvailable: () => true,
+        executor: () => {
+          readCalled = true;
+          return { description: "", status: "failed", stdout: null, stderr: null, exitCode: 1, durationMs: 0 };
+        },
+      },
+    });
+
+    assert.equal(result.status, "blocked");
+    assert.equal(result.executed, false);
+    assert.equal(readCalled, false, "Executor should not be called when reviewConfirm is wrong");
+  });
 });
