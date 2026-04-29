@@ -33,6 +33,12 @@ import {
   LIVE_HUMAN_DECISION_CONFIRM,
   REVIEWED_HUMAN_DECISION_PLAN_CONFIRM,
 } from "../orchestrator/live-human-decision-runner.js";
+import {
+  generateLiveAnalyticsReportPlan,
+  executeLiveAnalyticsReport,
+  LIVE_ANALYTICS_REPORT_CONFIRM,
+  REVIEWED_ANALYTICS_REPORT_PLAN_CONFIRM,
+} from "../orchestrator/live-analytics-report-runner.js";
 import { buildDemoWorkEvents } from "./work-events-demo.js";
 import { buildOperatorTasksOverview } from "./operator-tasks-demo.js";
 import {
@@ -52,6 +58,8 @@ import {
   redactLiveCandidateWriteResult,
   redactLiveHumanDecisionPlan,
   redactLiveHumanDecisionResult,
+  redactLiveAnalyticsReportPlan,
+  redactLiveAnalyticsReportResult,
   redactWorkEvents,
 } from "./redaction.js";
 import type { OrgOverviewAgentView, OrgOverviewView } from "../types/work-event.js";
@@ -525,6 +533,83 @@ async function handleApi(
         decisionNote,
       });
       jsonResponse(res, redactLiveHumanDecisionResult(result));
+      return;
+    }
+
+    // ── Phase 7.8: Live Analytics Report (Two-Step) ──
+
+    if (url.pathname === "/api/live/analytics/generate-report-plan" && req.method === "POST") {
+      if (!isLocalRequest(req)) {
+        errorResponse(res, 403, "仅允许本地访问");
+        return;
+      }
+      if (!requireJsonContentType(req, res)) {
+        return;
+      }
+
+      let body: Record<string, unknown>;
+      try {
+        body = await parseJsonBody(req);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "";
+        if (msg.includes("too large")) {
+          errorResponse(res, 413, "请求体过大");
+        } else {
+          errorResponse(res, 400, "请求格式错误");
+        }
+        return;
+      }
+
+      const periodStart = typeof body.periodStart === "string" ? body.periodStart : undefined;
+      const periodEnd = typeof body.periodEnd === "string" ? body.periodEnd : undefined;
+
+      const plan = await generateLiveAnalyticsReportPlan({ periodStart, periodEnd });
+      jsonResponse(res, redactLiveAnalyticsReportPlan(plan));
+      return;
+    }
+
+    if (url.pathname === "/api/live/analytics/execute-report" && req.method === "POST") {
+      if (!isLocalRequest(req)) {
+        errorResponse(res, 403, "仅允许本地访问");
+        return;
+      }
+      if (!requireJsonContentType(req, res)) {
+        return;
+      }
+
+      let body: Record<string, unknown>;
+      try {
+        body = await parseJsonBody(req);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "";
+        if (msg.includes("too large")) {
+          errorResponse(res, 413, "请求体过大");
+        } else {
+          errorResponse(res, 400, "请求格式错误");
+        }
+        return;
+      }
+
+      if (body.confirm !== LIVE_ANALYTICS_REPORT_CONFIRM) {
+        errorResponse(res, 403, "确认短语错误，拒绝执行。");
+        return;
+      }
+      if (body.reviewConfirm !== REVIEWED_ANALYTICS_REPORT_PLAN_CONFIRM) {
+        errorResponse(res, 403, "审阅确认短语错误，请先审阅报告计划。");
+        return;
+      }
+
+      const periodStart = typeof body.periodStart === "string" ? body.periodStart : undefined;
+      const periodEnd = typeof body.periodEnd === "string" ? body.periodEnd : undefined;
+
+      const result = await executeLiveAnalyticsReport({
+        confirm: body.confirm as string,
+        reviewConfirm: body.reviewConfirm as string,
+        planNonce: (body.planNonce as string) ?? "",
+        periodStart,
+        periodEnd,
+      });
+      jsonResponse(res, redactLiveAnalyticsReportResult(result));
       return;
     }
 

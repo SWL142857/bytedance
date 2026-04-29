@@ -27,6 +27,7 @@
 | Phase 7.5 | 完成 | request guards 抽取，route/body/write/RAG 安全边界补测试 |
 | Phase 7.6 | 完成 | Live Base bootstrap：preflight、setup、seed（含 job link）、安全 report |
 | Phase 7.7 | 完成 | Live human decision：`decision_pending -> offer/rejected`，双确认 + TOCTOU guard |
+| Phase 7.8 | 完成 | Live analytics report：只读聚合真实 Base，双确认后写 Reports + Agent Runs |
 
 ## Current Capabilities
 
@@ -42,6 +43,8 @@
 - `POST /api/live/candidates/:linkId/execute-writes`：双确认 + planNonce 后写回 pipeline 产物到 `decision_pending`。
 - `POST /api/live/candidates/:linkId/generate-human-decision-plan`：生成人类决策计划摘要。
 - `POST /api/live/candidates/:linkId/execute-human-decision`：双确认 + planNonce 后写回 offer/rejected 人类决策。
+- `POST /api/live/analytics/generate-report-plan`：只读聚合真实 Base，生成 Analytics 报告写回计划。
+- `POST /api/live/analytics/execute-report`：双确认 + planNonce 后写回 Reports + Agent Runs。
 
 ## Deferred
 
@@ -49,7 +52,6 @@
 |----|------|
 | RAG retriever integration | 等队友接入真实数据集、evidence 更新频率和 retriever 形态后再做 |
 | Write-back UI execute button | UI 写入需要单独安全交互设计；当前只展示 write plan summary |
-| Live analytics report | 本地 analytics 已有，真实 Base 聚合和 Reports 写回还缺 dedicated live runner |
 
 ## Next Focus
 
@@ -57,7 +59,7 @@
 
 1. ~~Base bootstrap / seed 真实验证，补 job link 自动关联。~~ 已完成 (Phase 7.6)
 2. ~~Live human decision runner：只允许 `decision_pending -> offer/rejected`。~~ 已完成 (Phase 7.7)
-3. Live analytics runner：只读聚合 Base，生成并写 Reports。
+3. ~~Live analytics runner：只读聚合 Base，生成并写 Reports。~~ 已完成 (Phase 7.8)
 4. Operator runbook：把真实飞书流程串成可重复执行的命令顺序。
 
 详细任务见 [Live MVP Work Plan](live-mvp-work-plan.md)。

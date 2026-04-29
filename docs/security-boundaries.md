@@ -22,7 +22,7 @@
 - `requireJsonContentType()` 精确解析 media type，只接受 `application/json`。
 - `parseJsonBody()` 限制 4KB，非法 JSON 或非对象 JSON 返回 400。
 
-当前 live POST route 都保持 loopback guard。Provider demo、execute-writes 和 human decision 还要求 JSON content-type 和 body cap。
+当前 live POST route 都保持 loopback guard。Provider demo、execute-writes、human decision 和 analytics report 还要求 JSON content-type 和 body cap。
 
 ## Provider Boundaries
 
@@ -52,7 +52,7 @@ Live candidate write scope 当前只允许：
 - Interview Kits
 - Agent Runs
 
-Reports 不在 Phase 7.0 live candidate write scope 内；Analytics report 需要后续 dedicated live analytics runner。
+Reports 不在 Phase 7.0 live candidate write scope 内；Analytics report 使用 Phase 7.8 的 dedicated live analytics runner。
 
 Human decision 是独立 guarded runner（Phase 7.7），只允许：
 
@@ -61,6 +61,15 @@ Human decision 是独立 guarded runner（Phase 7.7），只允许：
 - Actor 必须是 `human_confirm`
 - 双确认 + planNonce TOCTOU guard
 - Agent 不能触发 offer/rejected
+
+Analytics report 是独立 guarded runner（Phase 7.8），只允许：
+
+- 只读读取 Candidates、Evaluations、Agent Runs
+- 写入 Reports 和 Agent Runs
+- 不写 Candidates、Evaluations、Interview Kits、Resume Facts
+- 不做任何 status transition
+- 双确认 + planNonce TOCTOU guard
+- 没有候选人数据时 `needs_review`，不写空报告
 
 ## Redaction Rules
 

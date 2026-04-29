@@ -244,6 +244,67 @@ pnpm provider:dataset-verify \
 
 该命令只验证 provider 模型执行和本地 snapshot，不做 Base 写入。缺少 provider env 时会 blocked，不 fallback deterministic。
 
+## Live Analytics Report
+
+生成报告写回计划：
+
+```text
+POST /api/live/analytics/generate-report-plan
+```
+
+请求 body 使用空对象，也可以指定周期：
+
+```json
+{
+  "periodStart": "2026-04-22 00:00:00",
+  "periodEnd": "2026-04-29 23:59:59"
+}
+```
+
+返回安全摘要：
+
+- `status`
+- `planNonce`
+- `periodStart`
+- `periodEnd`
+- `candidateCount`
+- `evaluationCount`
+- `agentRunCount`
+- `commandCount`
+- `commands[].description`
+- `commands[].targetTable`
+- `safeSummary`
+
+没有候选人数据时返回 `needs_review`，不生成写入命令。
+
+执行报告写回：
+
+```text
+POST /api/live/analytics/execute-report
+```
+
+请求 body：
+
+```json
+{
+  "confirm": "EXECUTE_LIVE_ANALYTICS_REPORT_WRITE",
+  "reviewConfirm": "REVIEWED_LIVE_ANALYTICS_REPORT_PLAN",
+  "planNonce": "<generate-report-plan 返回的 nonce>",
+  "periodStart": "2026-04-22 00:00:00",
+  "periodEnd": "2026-04-29 23:59:59"
+}
+```
+
+该路径会重新只读聚合 Candidates、Evaluations、Agent Runs，重新生成报告计划并复算 nonce，通过后只写 Reports 和 Agent Runs。
+
+安全约束：
+
+- 双确认短语 + planNonce TOCTOU guard。
+- Reports 不进入 live candidate write scope。
+- 不写 Candidates，也不做任何状态转换。
+- 响应不包含 record ID、resume、payload、stdout/stderr、prompt 或 provider secret。
+- 缺少 `HIRELOOP_ALLOW_LARK_WRITE=1` 时阻断执行。
+
 ## Recommended Demo Order
 
 本地演示：
@@ -264,4 +325,4 @@ pnpm base:bootstrap:dry-run
 pnpm ui:dev
 ```
 
-真实飞书写回演示现在可以走到 `decision_pending -> offer/rejected` 的人工最终决策；完整闭环还差 [Live MVP Work Plan](live-mvp-work-plan.md) 中的 live analytics runner。
+真实飞书写回 API 现在可以走完 pipeline write -> human decision -> analytics report。下一步是 [Live MVP Work Plan](live-mvp-work-plan.md) 中的 7.9 runbook，把这些步骤串成可重复执行的命令顺序。

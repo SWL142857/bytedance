@@ -627,6 +627,163 @@ describe("server API routes", () => {
     assert.equal(res.status, 404);
   });
 
+  // ── Phase 7.8: Live Analytics Report ──
+
+  const ANALYTICS_PLAN_BODY = {};
+
+  const ANALYTICS_EXEC_BODY = {
+    confirm: "EXECUTE_LIVE_ANALYTICS_REPORT_WRITE",
+    reviewConfirm: "REVIEWED_LIVE_ANALYTICS_REPORT_PLAN",
+    planNonce: "deadbeef12345678",
+  };
+
+  it("POST generate-report-plan rejects non-JSON content type", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/analytics/generate-report-plan`, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify(ANALYTICS_PLAN_BODY),
+    });
+    assert.equal(res.status, 415);
+  });
+
+  it("POST generate-report-plan rejects oversized body", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/analytics/generate-report-plan`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filler: "x".repeat(5000) }),
+    });
+    assert.equal(res.status, 413);
+  });
+
+  it("POST generate-report-plan rejects non-object JSON", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/analytics/generate-report-plan`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "null",
+    });
+    assert.equal(res.status, 400);
+  });
+
+  it("POST generate-report-plan returns blocked or needs_review without env", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/analytics/generate-report-plan`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(ANALYTICS_PLAN_BODY),
+    });
+    assert.ok(res.ok);
+    const data = await res.json() as Record<string, unknown>;
+    assert.ok(data.status === "blocked" || data.status === "needs_review");
+    assert.equal(typeof data.planNonce, "string");
+    assert.equal(typeof data.safeSummary, "string");
+  });
+
+  it("POST execute-report with wrong confirm returns 403", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/analytics/execute-report`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...ANALYTICS_EXEC_BODY, confirm: "wrong" }),
+    });
+    assert.equal(res.status, 403);
+    const data = await res.json() as { error: string };
+    assert.equal(data.error, "确认短语错误，拒绝执行。");
+  });
+
+  it("POST execute-report with wrong reviewConfirm returns 403", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/analytics/execute-report`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...ANALYTICS_EXEC_BODY, reviewConfirm: "wrong" }),
+    });
+    assert.equal(res.status, 403);
+    const data = await res.json() as { error: string };
+    assert.equal(data.error, "审阅确认短语错误，请先审阅报告计划。");
+  });
+
+  it("POST execute-report rejects non-JSON content type", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/analytics/execute-report`, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify(ANALYTICS_EXEC_BODY),
+    });
+    assert.equal(res.status, 415);
+  });
+
+  it("POST execute-report rejects oversized body", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/analytics/execute-report`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...ANALYTICS_EXEC_BODY, filler: "x".repeat(5000) }),
+    });
+    assert.equal(res.status, 413);
+  });
+
+  it("POST execute-report rejects non-object JSON", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/analytics/execute-report`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "[]",
+    });
+    assert.equal(res.status, 400);
+  });
+
+  it("POST execute-report with double confirm but bad nonce returns blocked", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/analytics/execute-report`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(ANALYTICS_EXEC_BODY),
+    });
+    assert.ok(res.ok);
+    const data = await res.json() as Record<string, unknown>;
+    assert.equal(data.status, "blocked");
+    assert.equal(data.executed, false);
+  });
+
+  it("GET generate-report-plan returns 404", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/analytics/generate-report-plan`);
+    assert.equal(res.status, 404);
+  });
+
+  it("GET execute-report returns 404", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/analytics/execute-report`);
+    assert.equal(res.status, 404);
+  });
+
+  it("analytics responses do not leak sensitive fields", async () => {
+    const paths = [
+      { path: "/api/live/analytics/generate-report-plan", body: JSON.stringify(ANALYTICS_PLAN_BODY) },
+      { path: "/api/live/analytics/execute-report", body: JSON.stringify(ANALYTICS_EXEC_BODY) },
+    ];
+    for (const { path, body } of paths) {
+      const res = await fetch(`${BASE_URL}${path}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+      });
+      const text = await res.text();
+      assert.ok(!text.includes("rec_"), `${path} must not contain rec_`);
+      assert.ok(!text.includes("payload"), `${path} must not contain payload`);
+      assert.ok(!text.includes("stdout"), `${path} must not contain stdout`);
+      assert.ok(!text.includes("stderr"), `${path} must not contain stderr`);
+      assert.ok(!text.includes("apiKey"), `${path} must not contain apiKey`);
+      assert.ok(!text.includes("endpoint"), `${path} must not contain endpoint`);
+      assert.ok(!text.includes("modelId"), `${path} must not contain modelId`);
+      assert.ok(!text.includes("baseAppToken"), `${path} must not contain baseAppToken`);
+    }
+  });
+
+  it("analytics responses use safe Chinese error messages", async () => {
+    const res = await fetch(`${BASE_URL}/api/live/analytics/execute-report`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(ANALYTICS_EXEC_BODY),
+    });
+    const text = await res.text();
+    assert.ok(!text.includes("Error:"), "must not leak Error:");
+    assert.ok(!text.includes("stack"), "must not leak stack");
+    assert.ok(!text.includes(".ts:"), "must not leak .ts: paths");
+    assert.ok(!text.includes(".js:"), "must not leak .js: paths");
+  });
+
   it("human decision responses do not leak sensitive fields", async () => {
     const paths = [
       { path: "/api/live/candidates/lnk_live_nonexistent/generate-human-decision-plan", body: JSON.stringify(DECISION_PLAN_BODY) },

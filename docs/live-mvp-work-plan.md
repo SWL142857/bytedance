@@ -13,7 +13,7 @@
 
 ## Current Gap Assessment
 
-截至 2026-04-29，本地/demo 版已 100% 跑通；真实飞书端到端约 80%-85% 完成，剩余主缺口是 live analytics report。
+截至 2026-04-29，本地/demo 版已 100% 跑通；真实飞书端到端 API 闭环已补齐，剩余主缺口是 7.9 的可重复 runbook 和真实飞书 smoke。
 
 | 步骤 | 当前状态 | 还差什么 |
 |------|----------|----------|
@@ -22,7 +22,7 @@
 | 3. 写入示例岗位和候选人 | `pnpm base:seed:dry-run` 可生成 91 条命令 | 已完成：bootstrap 自动关联 job link；candidate.job 使用真实 `rec_xxx` |
 | 4. 触发 pipeline | 本地完整；live candidate 写回到 `decision_pending` 已具备 | 需要真实飞书 smoke；当前 live write 使用 deterministic pipeline |
 | 5. 人类最终决策 | 本地 `Human Decision` 有，旧 live MVP runner 有 demo 形态 | 已完成：`generateLiveHumanDecisionPlan` + `executeLiveHumanDecision`，双确认 + TOCTOU guard |
-| 6. Analytics 周报 | 本地 Analytics 有，旧 live MVP plan 有 demo 形态 | 还缺从真实 Base 聚合数据并写 Reports 的 live analytics runner |
+| 6. Analytics 周报 | 本地 Analytics 有，旧 live MVP plan 有 demo 形态 | 已完成：live analytics runner 只读聚合真实 Base 并写 Reports + Agent Runs |
 
 ## Recommended Next Phases
 
@@ -75,17 +75,21 @@
 
 目标：从真实 Base 只读聚合数据，生成 Reports 写回。
 
-范围：
+状态：完成（2026-04-29）。
 
-- 只读读取 Candidates、Evaluations、Agent Runs。
-- 生成 analytics input summary。
-- 使用 deterministic client 先跑 analytics；provider analytics 后置。
-- 生成 `Reports` upsert plan。
-- 需要独立 confirm，例如 `EXECUTE_LIVE_ANALYTICS_REPORT_WRITE`。
+实现：
+
+- `src/orchestrator/live-analytics-report-runner.ts`：封装 `generateLiveAnalyticsReportPlan()` 和 `executeLiveAnalyticsReport()`。
+- 只读读取 Candidates、Evaluations、Agent Runs，映射为现有 `AnalyticsInput` 聚合快照。
+- 使用 deterministic `runAnalytics()`，provider analytics 后置。
+- 两步执行：生成计划返回 planNonce → 执行时双确认 + 重新读取 Base + 复算 nonce。
+- 确认短语：`EXECUTE_LIVE_ANALYTICS_REPORT_WRITE` + `REVIEWED_LIVE_ANALYTICS_REPORT_PLAN`。
+- Dedicated scope validator 只允许 Reports + Agent Runs，不把 Reports 加入 live candidate write scope。
+- Server routes：`POST /api/live/analytics/generate-report-plan` 和 `POST /api/live/analytics/execute-report`。
 
 验收：
 
-- 没有候选人数据时返回 `needs_review` 或 `blocked`，不写空报告。
+- 没有候选人数据时返回 `needs_review`，不写空报告。
 - 报告写入 Reports 和 Agent Runs。
 - 响应只返回安全 summary、period、count、status。
 - Reports 写入不混入 live candidate write scope，保持 dedicated runner。
@@ -111,7 +115,7 @@
 RAG 现在不应该插在最前面。原因：
 
 - Phase 7.3/7.4 已经把 `AgentInputBundle`、evidence loader 和 verification report 做好。
-- 真实飞书 MVP 闭环还缺 human decision 和 analytics 写回，这比 RAG 更接近产品可演示价值。
+- 真实飞书 MVP 闭环的 API 能力已经补齐，接下来更需要 7.9 runbook 和真实 smoke，而不是提前改 RAG。
 - 队友的数据集、evidence 更新频率、retriever 形态还没最终进入仓库。
 
 RAG 接入恢复条件：
