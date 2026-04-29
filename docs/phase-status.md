@@ -28,6 +28,7 @@
 | Phase 7.6 | 完成 | Live Base bootstrap：preflight、setup、seed（含 job link）、安全 report |
 | Phase 7.7 | 完成 | Live human decision：`decision_pending -> offer/rejected`，双确认 + TOCTOU guard |
 | Phase 7.8 | 完成 | Live analytics report：只读聚合真实 Base，双确认后写 Reports + Agent Runs |
+| Phase 7.9 | 完成 | Live E2E runbook：13 步可重复命令顺序，5 个 sample scenario，失败恢复规则 |
 
 ## Current Capabilities
 
@@ -45,6 +46,7 @@
 - `POST /api/live/candidates/:linkId/execute-human-decision`：双确认 + planNonce 后写回 offer/rejected 人类决策。
 - `POST /api/live/analytics/generate-report-plan`：只读聚合真实 Base，生成 Analytics 报告写回计划。
 - `POST /api/live/analytics/execute-report`：双确认 + planNonce 后写回 Reports + Agent Runs。
+- `pnpm mvp:live-e2e-runbook`：输出 13 步 E2E runbook，支持 5 个 sample scenario，不需要真实 env。
 
 ## Deferred
 
@@ -55,11 +57,13 @@
 
 ## Next Focus
 
-优先级不是 RAG，而是补齐真实飞书 MVP 闭环：
+真实飞书 MVP 闭环已补齐，API + runbook 均已就绪。下一步：
 
 1. ~~Base bootstrap / seed 真实验证，补 job link 自动关联。~~ 已完成 (Phase 7.6)
 2. ~~Live human decision runner：只允许 `decision_pending -> offer/rejected`。~~ 已完成 (Phase 7.7)
 3. ~~Live analytics runner：只读聚合 Base，生成并写 Reports。~~ 已完成 (Phase 7.8)
-4. Operator runbook：把真实飞书流程串成可重复执行的命令顺序。
+4. ~~Operator runbook：把真实飞书流程串成可重复执行的命令顺序。~~ 已完成 (Phase 7.9)
+5. 真实飞书 smoke：在真实 Base 上跑一遍完整流程验证。
+6. RAG retriever integration：等队友接入真实数据集。
 
 详细任务见 [Live MVP Work Plan](live-mvp-work-plan.md)。

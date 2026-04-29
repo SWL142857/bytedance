@@ -325,4 +325,88 @@ pnpm base:bootstrap:dry-run
 pnpm ui:dev
 ```
 
-真实飞书写回 API 现在可以走完 pipeline write -> human decision -> analytics report。下一步是 [Live MVP Work Plan](live-mvp-work-plan.md) 中的 7.9 runbook，把这些步骤串成可重复执行的命令顺序。
+真实飞书写回 API 现在可以走完 pipeline write -> human decision -> analytics report。下方 Live E2E Runbook 把这些步骤串成可重复执行的命令顺序。
+
+## Live E2E Runbook
+
+E2E runbook 把真实飞书 MVP 闭环串成 13 步可重复执行的命令顺序。
+
+```bash
+# 查看默认 runbook（无 env，所有步骤 blocked）
+pnpm mvp:live-e2e-runbook
+
+# 查看各阶段 sample
+pnpm mvp:live-e2e-runbook --sample-fresh
+pnpm mvp:live-e2e-runbook --sample-after-bootstrap
+pnpm mvp:live-e2e-runbook --sample-ready-to-write
+pnpm mvp:live-e2e-runbook --sample-after-partial-failure
+pnpm mvp:live-e2e-runbook --sample-complete
+```
+
+### 步骤顺序
+
+| 步骤 | 名称 | 命令 | 可重跑 |
+|------|------|------|--------|
+| 1 | 环境与飞书凭据 | `export 飞书凭据...` | 是 |
+| 2 | Bootstrap Dry-Run | `pnpm base:bootstrap:dry-run` | 是 |
+| 3 | Bootstrap Execute | `pnpm base:bootstrap:execute` | 否 |
+| 4 | 启动本地 UI | `pnpm ui:dev` | 是 |
+| 5 | Live Records 检查 | `GET /api/live/records?table=candidates` | 是 |
+| 6 | 候选人写回计划 | `POST generate-write-plan` | 是 |
+| 7 | 执行候选人写回 | `POST execute-writes` | 否 |
+| 8 | 人类决策计划 | `POST generate-human-decision-plan` | 是 |
+| 9 | 执行人类决策 | `POST execute-human-decision` | 否 |
+| 10 | Analytics 报告计划 | `POST generate-report-plan` | 是 |
+| 11 | 执行 Analytics 报告 | `POST execute-report` | 否 |
+| 12 | 验证 | `pnpm mvp:live-verification` | 是 |
+| 13 | Recovery Review | `pnpm mvp:live-recovery` | 是 |
+
+### 失败恢复规则
+
+- dry-run / plan / readiness / verification 可以安全重跑。
+- execute 步骤（3、7、9、11）失败后不能盲目重跑，必须先：
+  1. 运行 `pnpm mvp:live-recovery` 检查 partial writes。
+  2. 人工核查 Base 中已写入的记录。
+  3. 决定 targeted retry 还是人工补偿。
+- bootstrap execute 在非空 Base 上必须 fail closed。
+
+### 完整真实飞书演示流程
+
+```bash
+# 1. 配置飞书凭据
+export LARK_APP_ID=<飞书应用ID>
+export LARK_APP_SECRET=<飞书密钥>
+export BASE_APP_TOKEN=<Base Token>
+export HIRELOOP_ALLOW_LARK_READ=1
+
+# 2. Bootstrap dry-run
+pnpm base:bootstrap:dry-run
+
+# 3. Bootstrap execute（需要写入权限）
+export HIRELOOP_ALLOW_LARK_WRITE=1
+pnpm base:bootstrap:execute
+
+# 4. 启动 UI
+pnpm ui:dev
+
+# 5. 检查 live records
+curl "http://localhost:3000/api/live/records?table=candidates"
+
+# 6-7. 候选人写回（通过 API，需要 linkId）
+# POST /api/live/candidates/:linkId/generate-write-plan
+# POST /api/live/candidates/:linkId/execute-writes
+
+# 8-9. 人类决策（通过 API）
+# POST /api/live/candidates/:linkId/generate-human-decision-plan
+# POST /api/live/candidates/:linkId/execute-human-decision
+
+# 10-11. Analytics 报告（通过 API）
+# POST /api/live/analytics/generate-report-plan
+# POST /api/live/analytics/execute-report
+
+# 12. 验证
+pnpm mvp:live-verification
+
+# 13. Recovery review
+pnpm mvp:live-recovery
+```

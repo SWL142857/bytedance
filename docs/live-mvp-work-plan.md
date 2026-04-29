@@ -98,17 +98,25 @@
 
 目标：把真实飞书 MVP 闭环整理成一套可重复操作的 runbook。
 
-范围：
+状态：完成（2026-04-29）。
 
-- 串联 bootstrap -> live records -> dry-run -> write plan -> execute writes -> human decision -> analytics report -> verification。
-- 增加 CLI 或文档化命令顺序。
-- 增加失败恢复说明：哪些步骤可重跑，哪些步骤必须先人工核查 Base。
+实现：
+
+- `src/orchestrator/live-e2e-runbook.ts`：封装 `buildLiveE2eRunbook()`，生成 13 步 E2E runbook，每步包含 goal、commandHint、successCriteria、failureRecovery、safetyNote、rerunnable。
+- `scripts/demo-live-e2e-runbook.ts`：CLI 入口，支持 5 个 sample scenario（`--sample-fresh`、`--sample-after-bootstrap`、`--sample-ready-to-write`、`--sample-after-partial-failure`、`--sample-complete`），不需要真实飞书 env。
+- `pnpm mvp:live-e2e-runbook`：输出安全 runbook，默认无 env 时所有步骤 blocked。
+- 步骤覆盖：环境凭据 → Bootstrap dry-run/execute → 启动 UI → Live records → 写回计划/执行 → 人类决策计划/执行 → Analytics 计划/执行 → 验证 → Recovery review。
+- 明确 rerun 策略：dry-run / plan / readiness / verification 可安全重跑；execute 步骤失败后必须先 recovery review + Base 人工核查。
+- 输出安全投影：不包含 record ID、resume 原文、token、payload、stdout/stderr、provider secret。
+- 新增 20+ 测试覆盖 runbook 模块和 CLI 脚本。
 
 验收：
 
 - 一个开发者能按 runbook 在空 Base 上完成最小演示。
-- 每一步都有 blocked/success 判定。
-- 任何失败都不会要求盲目重跑整链路。
+- 每一步都有 blocked/success/manual/failed 判定。
+- 失败恢复说明具体，不要求"重跑整条 pipeline"。
+- 输出和 API 响应不泄露敏感字段。
+- `pnpm mvp:live-e2e-runbook` 在无 env 时安全输出 blocked runbook，不抛异常。
 
 ## Why RAG Waits
 

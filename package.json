@@ -28,6 +28,7 @@
     "mvp:live-recovery": "node --import tsx scripts/demo-live-recovery-plan.ts",
     "mvp:live-verification": "node --import tsx scripts/demo-live-verification-report.ts",
     "mvp:live-runbook": "node --import tsx scripts/demo-live-operator-runbook.ts",
+    "mvp:live-e2e-runbook": "node --import tsx scripts/demo-live-e2e-runbook.ts",
     "mvp:release-gate": "node --import tsx scripts/demo-mvp-release-gate.ts",
     "mvp:pre-api-freeze": "node --import tsx scripts/demo-pre-api-freeze-report.ts",
     "mvp:provider-readiness": "node --import tsx scripts/demo-provider-adapter-readiness.ts",
