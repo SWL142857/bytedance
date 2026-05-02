@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { generateSetupPlan, generateSeedPlan, generateFullPlan, validateExecutablePlan, ExecutionBlockedError } from "../src/base/commands.js";
+import { generateSetupPlan, generateSeedPlan, generateFullPlan, generateSchemaMigrationPlan, validateExecutablePlan, ExecutionBlockedError } from "../src/base/commands.js";
 import { ALL_TABLES } from "../src/base/schema.js";
 import { DEMO_JOB, DEMO_CANDIDATE, ALL_DEMO_SEEDS } from "../src/fixtures/demo-data.js";
 import { runPlan } from "../src/base/lark-cli-runner.js";
@@ -234,6 +234,38 @@ describe("base command planner — full plan ordering", () => {
 
   it("full plan also has zero unsupported fields", () => {
     assert.equal(plan.unsupportedFields.length, 0);
+  });
+});
+
+describe("base command planner — schema migration plan", () => {
+  const plan = generateSchemaMigrationPlan();
+
+  it("generates field-update commands for existing select fields", () => {
+    assert.ok(plan.commands.length > 0, "migration plan should include select field updates");
+    for (const cmd of plan.commands) {
+      assert.equal(cmd.command, "lark-cli");
+      assert.ok(cmd.args.includes("+field-update"), `Missing +field-update in: ${cmd.description}`);
+      assert.ok(cmd.args.includes("--field-id"), `Missing --field-id in: ${cmd.description}`);
+      assert.equal(cmd.writesRemote, true);
+      assert.equal(cmd.needsBaseToken, true);
+    }
+  });
+
+  it("updates Agent Runs and Work Events agent_name options for P3 agents", () => {
+    const agentNameUpdates = plan.commands.filter((cmd) =>
+      cmd.description.includes('field "agent_name"'),
+    );
+    assert.equal(agentNameUpdates.length, 2);
+
+    for (const cmd of agentNameUpdates) {
+      const jsonArg = cmd.args[cmd.args.indexOf("--json") + 1];
+      assert.ok(jsonArg);
+      const fieldJson = JSON.parse(jsonArg);
+      const options = fieldJson.options.map((opt: { name: string }) => opt.name);
+      for (const expected of ["resume_intake", "resume_extraction", "screening_reviewer", "graph_builder"]) {
+        assert.ok(options.includes(expected), `missing ${expected} in ${cmd.description}`);
+      }
+    }
   });
 });
 

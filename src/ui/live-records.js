@@ -1,4 +1,5 @@
 import { esc, fetchJson, errorHtml } from "./helpers.js";
+import { UI_MESSAGES } from "./constants.js";
 
 export function renderLiveBaseStatus(data) {
   const el = document.getElementById("live-base-status");
@@ -11,7 +12,7 @@ export function renderLiveBaseStatus(data) {
       '<span class="live-status-icon ok">&#10003;</span>' +
       '<span class="live-status-text"><strong>飞书已连接</strong> &middot; 实时只读模式，所有写入已禁用</span>' +
       "</div>";
-    if (hint) hint.textContent = "飞书 Base 实时数据 · 只读模式";
+    if (hint) hint.textContent = UI_MESSAGES.SOURCE_FEISHU_LIVE;
   } else {
     const reasons = (data && data.blockedReasons) ? data.blockedReasons : ["飞书连接未配置"];
     const reasonItems = reasons.map(function (r) { return "<li>" + esc(r) + "</li>"; }).join("");

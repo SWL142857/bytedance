@@ -152,8 +152,8 @@ export async function runProviderAgentDemo(
       durationMs,
       blockedReasons: [],
       safeSummary: completed
-        ? `Provider agent demo succeeded. Resume Parser completed with ${result.commands.length} command(s).`
-        : "Provider agent demo failed safely. Resume Parser did not produce a successful output.",
+        ? `Legacy provider parser demo succeeded with ${result.commands.length} command(s).`
+        : "Legacy provider parser demo failed safely. Parser did not produce a successful output.",
     };
   } catch (err: unknown) {
     const durationMs = Date.now() - start;

@@ -1,5 +1,7 @@
 # Operations Runbook
 
+Current canonical handoff: `docs/current-state.md`.
+
 ## Local Verification
 
 ```bash
@@ -117,7 +119,7 @@ POST /api/live/candidates/:linkId/run-dry-run
 该路径：
 
 - 使用飞书只读读取候选人和岗位。
-- 使用 deterministic client 跑 4-agent pipeline。
+- 使用 deterministic client 跑当前安全 pipeline。
 - 写入本地 runtime snapshot。
 - 不写飞书，不调用 provider。
 
@@ -133,7 +135,7 @@ POST /api/live/candidates/:linkId/run-provider-agent-demo
 { "confirm": "EXECUTE_PROVIDER_AGENT_DEMO" }
 ```
 
-该路径只对真实候选人运行 provider-backed Resume Parser demo，不写 Base。
+该路径对真实候选人运行完整 P3 provider preview pipeline，不写 Base。它会产生安全 runtime snapshot；如果 provider 在某个 Agent 失败，前端必须展示 `failedAgent`，不能伪造成成功。
 
 ## Live Candidate Write Plan
 

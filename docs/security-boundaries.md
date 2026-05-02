@@ -1,5 +1,7 @@
 # Security Boundaries
 
+Current canonical handoff: `docs/current-state.md`.
+
 ## Non-Negotiable Rules
 
 | 边界 | 当前保障 | 不能退化 |
@@ -101,7 +103,7 @@ API JSON 和 UI 不应暴露：
 
 ## RAG Boundaries
 
-RAG evidence 当前不进入 prompt。Phase 7.3/7.4 只处理数据契约和验证报告。
+RAG evidence 当前不进入 prompt。Competition Graph RAG 只读 API/UI 可以展示安全结构化摘要，但不能把 evidence 塞进 Agent prompt，也不能写飞书。
 
 如果后续要让 evidence 进入 agent prompt，必须先明确：
 

@@ -117,6 +117,16 @@ describe("/api/work-events safe projection", () => {
     }
   });
 
+  it("demo fallback uses current 7-agent names, not retired P1 roles", async () => {
+    const { text } = await fetchRaw("/api/work-events");
+    assert.ok(text.includes("简历录入"), "work events should include current Resume Intake role");
+    assert.ok(text.includes("信息抽取"), "work events should include current Resume Extraction role");
+    assert.ok(text.includes("图谱构建"), "work events should include current Graph Builder role");
+    assert.ok(text.includes("图谱复核"), "work events should include current Reviewer role");
+    assert.ok(!text.includes("简历解析"), "work events must not show retired Resume Parser role");
+    assert.ok(!text.includes("初筛评估"), "work events must not show retired Screening role");
+  });
+
   it("non-GET requests are not honored", async () => {
     const res = await fetch(`${BASE_URL}/api/work-events`, { method: "POST" });
     assert.notEqual(res.status, 200);
@@ -170,7 +180,9 @@ describe("/api/org/overview safety summary", () => {
   });
 
   it("data_source does not leak snapshot path or sensitive fields", async () => {
-    const { text } = await fetchRaw("/api/org/overview");
+    const { json } = await fetchRaw("/api/org/overview");
+    const data = json as { data_source: unknown };
+    const text = JSON.stringify(data.data_source);
     assert.ok(!text.includes("snapshot_path"), "must not contain snapshot_path");
     assert.ok(!text.includes("rec_"), "must not contain record IDs");
     assert.ok(!text.includes("prompt"), "must not contain prompt");
@@ -178,12 +190,12 @@ describe("/api/org/overview safety summary", () => {
     assert.ok(!text.includes("payload"), "must not contain payload");
   });
 
-  it("agents include 5 virtual employees with Chinese role names", async () => {
+  it("agents include 7 virtual employees with Chinese role names (P3)", async () => {
     const { json } = await fetchRaw("/api/org/overview");
     const data = json as { agents: Array<{ agent_name: string; status: string }> };
-    assert.equal(data.agents.length, 5);
+    assert.equal(data.agents.length, 7);
     const names = data.agents.map((a) => a.agent_name);
-    for (const expected of ["HR 协调", "简历解析", "初筛评估", "面试准备", "数据分析"]) {
+    for (const expected of ["HR 协调", "简历录入", "信息抽取", "图谱构建", "图谱复核", "面试准备", "数据分析"]) {
       assert.ok(names.includes(expected), `expected agent ${expected}`);
     }
   });

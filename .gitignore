@@ -24,11 +24,24 @@ Thumbs.db
 docs/*
 !docs/
 !docs/architecture.md
+!docs/current-state.md
+!docs/competition-integration-handoff.zh.md
+!docs/competition-integration-handoff.en.md
 !docs/phase-status.md
 !docs/operations-runbook.md
 !docs/security-boundaries.md
 !docs/live-mvp-work-plan.md
 !docs/rag-contract.md
+!docs/design-system-tower.md
+!docs/implementation/
+!docs/implementation/*.md
+!docs/prompts/
+!docs/prompts/*.md
+!docs/superpowers/
+!docs/superpowers/specs/
+!docs/superpowers/specs/*.md
+!docs/superpowers/plans/
+!docs/superpowers/plans/*.md
 
 # Logs
 *.log
@@ -41,3 +54,11 @@ coverage/
 tmp/
 temp/
 *.bak
+.playwright-cli/
+output/playwright/
+
+# Teammate competition workspace: keep source/docs visible, keep generated data out
+competition.zip
+competition /artifacts/
+competition /memU/
+competition /src/memory_graph_pipeline/__pycache__/

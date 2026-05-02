@@ -63,11 +63,17 @@ import {
   redactWorkEvents,
 } from "./redaction.js";
 import type { OrgOverviewAgentView, OrgOverviewView } from "../types/work-event.js";
+import {
+  type CompetitionDemoOptions,
+  buildCompetitionDemoOverview,
+  buildCompetitionSearchResult,
+  buildCompetitionCandidateReview,
+} from "../runtime/competition-demo-view-model.js";
 
 const CONTENT_TYPES: Record<string, string> = {
-  ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
-  ".js": "application/javascript; charset=utf-8",
+  ".html": "text/html; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
   ".png": "image/png",
   ".svg": "image/svg+xml",
@@ -75,6 +81,11 @@ const CONTENT_TYPES: Record<string, string> = {
 
 const UI_DIR = resolve(import.meta.dirname, "..", "ui");
 const PORT = 3000;
+
+function getCompetitionDemoOptions(): CompetitionDemoOptions {
+  const competitionRoot = process.env["HIRELOOP_COMPETITION_ROOT"];
+  return competitionRoot ? { competitionRoot } : {};
+}
 const LIVE_TABLES = new Set(["candidates", "jobs", "work_events"]);
 
 export interface UiServerOptions {
@@ -147,9 +158,11 @@ function buildOrgOverview(): OrgOverviewView {
   }
 
   const agents: OrgOverviewAgentView[] = [
-    buildAgentOverview("HR 协调", "HR 协调", latestByAgent.get("HR 协调") ?? null),
-    buildAgentOverview("简历解析", "Resume Parser", latestByAgent.get("简历解析") ?? null),
-    buildAgentOverview("初筛评估", "Screening", latestByAgent.get("初筛评估") ?? null),
+    buildAgentOverview("HR 协调", "HR Coordinator", latestByAgent.get("HR 协调") ?? null),
+    buildAgentOverview("简历录入", "Resume Intake", latestByAgent.get("简历录入") ?? null),
+    buildAgentOverview("信息抽取", "Resume Extraction", latestByAgent.get("信息抽取") ?? null),
+    buildAgentOverview("图谱构建", "Graph Builder", latestByAgent.get("图谱构建") ?? null),
+    buildAgentOverview("图谱复核", "Screening Reviewer", latestByAgent.get("图谱复核") ?? null),
     buildAgentOverview("面试准备", "Interview Kit", latestByAgent.get("面试准备") ?? null),
     buildAgentOverview("数据分析", "Analytics", latestByAgent.get("数据分析") ?? null),
   ];
@@ -249,6 +262,36 @@ async function handleApi(
   try {
     options.beforeApiRoute?.(url.pathname);
 
+
+    // ── Competition Graph RAG Demo (read-only) ──
+
+    if (url.pathname === "/api/competition/overview" && req.method === "GET") {
+      const overview = buildCompetitionDemoOverview(getCompetitionDemoOptions());
+      jsonResponse(res, overview);
+      return;
+    }
+
+    if (url.pathname === "/api/competition/search" && req.method === "GET") {
+      const query = url.searchParams.get("q") ?? "";
+      const result = buildCompetitionSearchResult(query, getCompetitionDemoOptions());
+      jsonResponse(res, result);
+      return;
+    }
+
+    if (url.pathname === "/api/competition/review" && req.method === "GET") {
+      const candidateId = url.searchParams.get("candidateId") ?? "";
+      if (!candidateId) {
+        errorResponse(res, 400, "candidateId 参数不能为空");
+        return;
+      }
+      const review = buildCompetitionCandidateReview(candidateId, getCompetitionDemoOptions());
+      if (!review) {
+        errorResponse(res, 404, "未找到该候选人");
+        return;
+      }
+      jsonResponse(res, review);
+      return;
+    }
     if (url.pathname === "/api/demo/pipeline" && req.method === "GET") {
       const runtimeSnapshot = getRuntimeSnapshot(options);
       if (runtimeSnapshot) {

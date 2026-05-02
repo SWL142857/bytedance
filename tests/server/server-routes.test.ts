@@ -7,11 +7,27 @@ import { createServer, isLoopbackAddress } from "../../src/server/server.js";
 import type { Server } from "node:http";
 
 const BASE_URL = "http://localhost:3010";
+const originalFetch = globalThis.fetch;
+
+globalThis.fetch = function fetchWithoutKeepAlive(
+  input: Parameters<typeof fetch>[0],
+  init: Parameters<typeof fetch>[1] = {},
+): ReturnType<typeof fetch> {
+  const headers = new Headers(init.headers);
+  headers.set("Connection", "close");
+  return originalFetch(input, { ...init, headers });
+};
 
 async function fetchJson(path: string): Promise<Record<string, unknown>> {
-  const res = await fetch(`${BASE_URL}${path}`);
+  const res = await localFetch(path);
   assert.ok(res.ok, `GET ${path} returned ${res.status}`);
   return res.json() as Promise<Record<string, unknown>>;
+}
+
+function localFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  const headers = new Headers(init.headers);
+  headers.set("Connection", "close");
+  return fetch(`${BASE_URL}${path}`, { ...init, headers });
 }
 
 describe("server API routes", () => {
@@ -26,9 +42,8 @@ describe("server API routes", () => {
 
   afterEach(() => {
     return new Promise<void>((resolve) => {
-      server.close(() => resolve());
       server.closeIdleConnections?.();
-      server.closeAllConnections?.();
+      server.close(() => resolve());
     });
   });
 
@@ -1046,6 +1061,10 @@ describe("server API routes", () => {
       "reports.js",
       "live-records.js",
       "candidate-detail.js",
+      "graph-rag.js",
+      "agent-cards.js",
+      "org-relay.js",
+      "agent-relay-player.js",
     ];
     for (const mod of modules) {
       const res = await fetch(`${BASE_URL}/${mod}`);
@@ -1132,12 +1151,12 @@ describe("server API routes", () => {
     }
   });
 
-  it("index.html surfaces 组织运行总览 / 最近活动 sections", async () => {
+  it("index.html surfaces 真实飞书虚拟组织运行中枢 / 最近活动 sections", async () => {
     const res = await fetch(`${BASE_URL}/`);
     const text = await res.text();
-    assert.ok(text.includes("组织运行总览"), "index.html must include 组织运行总览");
+    assert.ok(text.includes("真实飞书虚拟组织运行中枢"), "index.html must include 真实飞书虚拟组织运行中枢");
     assert.ok(text.includes("最近活动"), "index.html must include 最近活动");
-    assert.ok(text.includes("操作员控制台"), "index.html must include 操作员控制台");
+    assert.ok(text.includes("飞书招聘虚拟组织控制台"), "index.html must include 飞书招聘虚拟组织控制台");
   });
 
   it("UI assets do not regress to deprecated editorial tokens", async () => {
@@ -1176,7 +1195,7 @@ describe("server API routes", () => {
     const indexText = await indexRes.text();
     assert.ok(liveText.includes("window._hireloopOpenFeishu"), "live-records.js must expose live open helper");
     assert.ok(liveText.includes('window.open("/go/" + encodeURIComponent(linkId)'), "live links must use browser navigation, not fetch redirects");
-    assert.ok(indexText.includes("飞书实时数据"), "index.html must render live Feishu data section");
+    assert.ok(indexText.includes("飞书只读"), "index.html must render live Feishu data section");
   });
 
   it("live records opens candidate detail only from candidate rows", async () => {
@@ -1212,6 +1231,10 @@ describe("server API routes", () => {
       "reports.js",
       "live-records.js",
       "candidate-detail.js",
+      "graph-rag.js",
+      "agent-cards.js",
+      "org-relay.js",
+      "agent-relay-player.js",
     ];
     for (const mod of modules) {
       const res = await fetch(`${BASE_URL}/${mod}`);
@@ -1328,7 +1351,7 @@ describe("server API routes", () => {
         commandCount: 3,
         commands: [],
         agentRuns: [],
-        failedAgent: "screening",
+        failedAgent: "screening_reviewer",
       },
       work_events: [],
       org_overview: {
@@ -1375,7 +1398,7 @@ describe("server API routes", () => {
       };
 
       assert.equal(pipeline.finalStatus, "parsed");
-      assert.equal(pipeline.failedAgent, "screening");
+      assert.equal(pipeline.failedAgent, "screening_reviewer");
       assert.equal(overview.safety.demo_mode, false);
       assert.equal(overview.data_source.mode, "runtime_snapshot");
       assert.equal(overview.data_source.snapshot_source, "deterministic");

@@ -21,9 +21,9 @@ const VALID_INPUT = {
 };
 
 describe("buildLiveMvpPlan — full plan generation", () => {
-  it("generates 20 write commands for complete pipeline + decision + report", async () => {
+  it("generates 24 write commands for complete pipeline + decision + report", async () => {
     const result = await buildLiveMvpPlan(VALID_INPUT);
-    assert.equal(result.commands.length, 20);
+    assert.equal(result.commands.length, 24);
   });
 
   it("pipeline uses resolved candidateRecordId", async () => {
@@ -106,7 +106,7 @@ describe("buildLiveMvpPlan — full plan generation", () => {
 describe("buildLiveMvpPlan — pipeline failure fail-closed", () => {
   it("throws before decision/report commands when pipeline does not complete", async () => {
     const failingClient = new DeterministicLlmClient({
-      screening_v1: JSON.stringify({ bad: "schema" }),
+      extraction_v1: JSON.stringify({ bad: "schema" }),
     });
 
     await assert.rejects(
@@ -114,7 +114,7 @@ describe("buildLiveMvpPlan — pipeline failure fail-closed", () => {
       (err: unknown) =>
         err instanceof LiveMvpPlanError &&
         err.message.includes("pipeline stopped at parsed") &&
-        err.message.includes("screening"),
+        err.message.includes("resume_extraction"),
     );
   });
 });
@@ -201,6 +201,6 @@ describe("buildLiveMvpPlan — custom client", () => {
   it("accepts custom LLM client", async () => {
     const client = new DeterministicLlmClient();
     const result = await buildLiveMvpPlan(VALID_INPUT, client);
-    assert.equal(result.commands.length, 20);
+    assert.equal(result.commands.length, 24);
   });
 });

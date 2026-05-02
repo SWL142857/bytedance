@@ -1,5 +1,7 @@
 # Live MVP Work Plan
 
+Current canonical handoff: `docs/current-state.md`.
+
 ## Target Flow
 
 目标真实流程：
@@ -13,14 +15,14 @@
 
 ## Current Gap Assessment
 
-截至 2026-04-29，本地/demo 版已 100% 跑通；真实飞书端到端 API 闭环已补齐，剩余主缺口是 7.9 的可重复 runbook 和真实飞书 smoke。
+截至 2026-05-02，本地/demo 版已跑通；真实飞书端到端 API 闭环和 13 步 runbook 已补齐。当前主缺口是真实飞书 smoke、provider preview 稳定性、已存在 Base 的 schema migration，以及 Virtual Org Console 前端落地。
 
 | 步骤 | 当前状态 | 还差什么 |
 |------|----------|----------|
 | 1. 配置飞书凭据和 Base token | 基础能力已具备 | 需要真实 env、`lark-cli auth`、权限确认 |
 | 2. 初始化 8 张表 | `pnpm base:plan` 可生成 89 条命令，0 unsupported fields | 已完成：`pnpm base:bootstrap:execute` 可在真实空 Base 上初始化 |
 | 3. 写入示例岗位和候选人 | `pnpm base:seed:dry-run` 可生成 91 条命令 | 已完成：bootstrap 自动关联 job link；candidate.job 使用真实 `rec_xxx` |
-| 4. 触发 pipeline | 本地完整；live candidate 写回到 `decision_pending` 已具备 | 需要真实飞书 smoke；当前 live write 使用 deterministic pipeline |
+| 4. 触发 pipeline | 本地完整；live candidate 写回到 `decision_pending` 已具备；P3 provider preview 已接入 | 需要真实飞书 smoke；provider preview 失败必须安全审计展示 |
 | 5. 人类最终决策 | 本地 `Human Decision` 有，旧 live MVP runner 有 demo 形态 | 已完成：`generateLiveHumanDecisionPlan` + `executeLiveHumanDecision`，双确认 + TOCTOU guard |
 | 6. Analytics 周报 | 本地 Analytics 有，旧 live MVP plan 有 demo 形态 | 已完成：live analytics runner 只读聚合真实 Base 并写 Reports + Agent Runs |
 
@@ -118,26 +120,25 @@
 - 输出和 API 响应不泄露敏感字段。
 - `pnpm mvp:live-e2e-runbook` 在无 env 时安全输出 blocked runbook，不抛异常。
 
-## Why RAG Waits
+## Graph RAG Status
 
-RAG 现在不应该插在最前面。原因：
+RAG 不再是“等待接入”的独立事项。Competition Graph RAG 已作为只读增强层接入，当前产品定位是 A（Feishu Live Pipeline）为主、B（Graph RAG）为解释增强。
 
-- Phase 7.3/7.4 已经把 `AgentInputBundle`、evidence loader 和 verification report 做好。
-- 真实飞书 MVP 闭环的 API 能力已经补齐，接下来更需要 7.9 runbook 和真实 smoke，而不是提前改 RAG。
-- 队友的数据集、evidence 更新频率、retriever 形态还没最终进入仓库。
+后续如果要把更多 raw evidence/snippet 引入 provider prompt，必须另开设计。当前允许的是安全结构化摘要：`graphProjection`、`topNeighbors`，以及已预留但尚未填充的 `gnnSignal`。
 
-RAG 接入恢复条件：
+进一步 RAG work 的触发条件和交接接口见 `docs/competition-integration-handoff.zh.md` / `docs/competition-integration-handoff.en.md`。当前优先级：
 
-- 队友提供可重复读取的数据集格式。
-- 明确 evidence 是内嵌在 candidate JSON，还是 evidence pool + candidate mapping。
+- 队友提供或生成 `gnn_predictions.csv`，填充 `/api/competition/review` 的 `gnnSignal`。
+- 将 Competition query-aware subgraph 输出整理成 view-model 字段，而不是 UI 直接调用 Python。
+- 评估是否将 `matchedFeatures` / `roleMemory` 的安全摘要进入 Reviewer。
 - 明确 evidence 是否每次 run 都更新；如果会更新，planNonce 需要纳入 evidence hash。
-- 明确 evidence 是否允许进入 prompt。默认不进入 prompt，只进入 snapshot/UI/verification。
+- 明确 raw evidence 是否允许进入 provider prompt。默认不允许。
 
 ## Suggested Team Split
 
-- 我方优先做 Phase 7.6-7.9，补真实飞书 MVP 闭环。
-- 数据/RAG 队友继续接入 dataset 和 retriever。
-- 两边在 `AgentInputBundle` 和 `RagDatasetVerificationReport` 对齐，不提前修改 pipeline agent input。
+- 前端/Antigravity 负责按 Virtual Org Console spec 实现真实数据 UI。
+- Codex 负责 review 前端实现，重点抓硬编码、API 契约和安全泄露。
+- 后端继续提升 provider preview 稳定性、Base schema migration 和真实飞书 smoke。
 
 ## Completion Definition
 
@@ -149,3 +150,15 @@ RAG 接入恢复条件：
 - 可以由人类确认写回 `offer` 或 `rejected`。
 - 可以基于真实 Base 数据生成并写入一条 Reports 周报。
 - 全流程不暴露 record ID、resume 原文、payload、stdout/stderr、provider secret 或 stack trace。
+
+## Graph RAG Enhancement (P2, 2026-05-01)
+
+Competition Graph RAG 作为 Feishu Live Pipeline 的增强层，嵌入 Graph Builder、Screening Reviewer 和 Decision 环节。A（Pipeline）为主，B（Graph RAG）为辅。具体接口见 Competition handoff docs。
+
+| 维度 | Feishu Live Pipeline | Graph RAG |
+|------|---------------------|-----------|
+| 数据源 | 飞书 Base 表 | `competition /` CSV |
+| 写入 | guarded write + 双确认 | 只读 |
+| 证据入 prompt | raw evidence 否 | raw evidence 否；结构化摘要可入 Reviewer |
+| 位置 | 主产品 | Pipeline Graph Builder/Reviewer/Decision 增强 |
+| 调用外部 LLM | provider adapter + confirm | 否 |

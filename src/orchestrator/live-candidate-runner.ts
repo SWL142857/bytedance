@@ -7,11 +7,9 @@ import {
 import { readLiveCandidateContext } from "./live-candidate-context.js";
 import type { LiveCandidateDeps } from "./live-candidate-context.js";
 import { loadConfig } from "../config.js";
-import {
-  runProviderAgentDemo,
-  type ProviderAgentDemoResult,
-} from "../llm/provider-agent-demo-runner.js";
-import type { ResumeParserInput } from "../agents/resume-parser.js";
+import { OpenAICompatibleClient } from "../llm/openai-compatible-client.js";
+import { buildProviderAdapterReadiness, mapProviderAdapterError } from "../llm/provider-adapter.js";
+import type { ProviderAgentDemoResult } from "../llm/provider-agent-demo-runner.js";
 
 // ── Types ──
 
@@ -160,50 +158,65 @@ export interface LiveCandidateProviderAgentDemoOptions {
   deps?: LiveCandidateRunnerDeps;
 }
 
+export interface LiveCandidateProviderPipelinePreviewResult extends ProviderAgentDemoResult {
+  finalStatus: string | null;
+  completed: boolean;
+  failedAgent: string | null;
+  agentRunCount: number | null;
+  snapshotUpdated: boolean;
+  realWrites: false;
+}
+
+function providerBlockedResult(
+  providerName: string,
+  reasons: string[],
+  safeSummary: string,
+): LiveCandidateProviderPipelinePreviewResult {
+  return {
+    mode: "execute",
+    status: "blocked",
+    providerName,
+    canCallExternalModel: false,
+    commandCount: null,
+    agentRunStatus: null,
+    retryCount: null,
+    durationMs: 0,
+    blockedReasons: reasons,
+    safeSummary,
+    finalStatus: null,
+    completed: false,
+    failedAgent: null,
+    agentRunCount: null,
+    snapshotUpdated: false,
+    realWrites: false,
+  };
+}
+
 export async function runLiveCandidateProviderAgentDemo(
   linkId: string,
   options: LiveCandidateProviderAgentDemoOptions,
-): Promise<ProviderAgentDemoResult> {
+): Promise<LiveCandidateProviderPipelinePreviewResult> {
   const deps = options.deps;
   const configFn = deps?.loadConfig ?? loadConfig;
+  const config = configFn();
 
   // 0. Check confirm phrase at execution boundary
   if (options.confirm !== PROVIDER_DEMO_CONFIRM) {
-    return {
-      mode: "execute",
-      status: "blocked",
-      providerName: configFn().modelProvider,
-      canCallExternalModel: false,
-      commandCount: null,
-      agentRunStatus: null,
-      retryCount: null,
-      durationMs: 0,
-      blockedReasons: ["确认短语错误，拒绝执行。"],
-      safeSummary: "确认短语错误，拒绝执行。",
-    };
+    return providerBlockedResult(
+      config.modelProvider,
+      ["确认短语错误，拒绝执行。"],
+      "确认短语错误，拒绝执行。",
+    );
   }
 
-  // 1. Read candidate context (job not required for provider preview)
-  const ctx = await readLiveCandidateContext(linkId, { requireJob: false, deps });
+  // 1. Read candidate + job context. Full P3 provider preview needs both.
+  const ctx = await readLiveCandidateContext(linkId, { requireJob: true, deps });
 
   if (ctx.status === "blocked") {
-    return {
-      mode: "execute",
-      status: "blocked",
-      providerName: configFn().modelProvider,
-      canCallExternalModel: false,
-      commandCount: null,
-      agentRunStatus: null,
-      retryCount: null,
-      durationMs: 0,
-      blockedReasons: ctx.blockedReasons,
-      safeSummary: ctx.safeSummary,
-    };
+    return providerBlockedResult(config.modelProvider, ctx.blockedReasons, ctx.safeSummary);
   }
 
-  const { config, candidateRecordId, candidateId, resumeText } = ctx.context;
-
-  // 2. Build provider adapter config and input
+  // 2. Build provider adapter config and fail closed before any model call.
   const providerConfig = {
     enabled: true,
     providerName: config.modelProvider,
@@ -212,23 +225,76 @@ export async function runLiveCandidateProviderAgentDemo(
     apiKey: config.modelApiKey,
   };
 
-  const parserInput: ResumeParserInput = {
+  const readiness = buildProviderAdapterReadiness(providerConfig);
+  const blockedReasons = [...readiness.blockedReasons];
+  if (!readiness.canCallExternalModel) {
+    blockedReasons.unshift("Provider adapter is not ready.");
+  }
+  if (blockedReasons.length > 0) {
+    return providerBlockedResult(
+      config.modelProvider,
+      blockedReasons,
+      `Provider Pipeline 预览被阻断：请先补齐模型配置。`,
+    );
+  }
+
+  const {
+    candidateRecordId, jobRecordId, candidateId, jobId,
+    resumeText, jobRequirements, jobRubric,
+  } = ctx.context;
+
+  const input: CandidatePipelineInput = {
     candidateRecordId,
+    jobRecordId: jobRecordId!,
     candidateId,
+    jobId: jobId!,
     resumeText: resumeText!,
-    fromStatus: "new",
+    jobRequirements: jobRequirements!,
+    jobRubric: jobRubric!,
   };
 
-  // 3. Run provider agent demo
+  // 3. Run full P3 pipeline with provider-backed LLM. Still no Feishu writes.
+  const start = Date.now();
   try {
-    const result = await runProviderAgentDemo(
-      providerConfig,
-      { useProvider: true, execute: true, confirm: options.confirm },
-      undefined,
-      parserInput,
-    );
-    return result;
-  } catch {
+    const client = new OpenAICompatibleClient({ config: providerConfig });
+    const result = await runCandidatePipeline(client, input);
+    const durationMs = Date.now() - start;
+
+    let snapshotUpdated = false;
+    try {
+      const snapshot = buildRuntimeDashboardSnapshot(result, {
+        source: "provider",
+        externalModelCalls: true,
+      });
+      writeRuntimeDashboardSnapshot(snapshot);
+      snapshotUpdated = true;
+    } catch {
+      // Snapshot write failure should not expose provider details or fail the preview.
+    }
+
+    const completed = result.completed && !result.failedAgent;
+    return {
+      mode: "execute",
+      status: completed ? "success" : "failed",
+      providerName: config.modelProvider,
+      canCallExternalModel: true,
+      commandCount: result.commands.length,
+      agentRunStatus: completed ? "success" : "failed",
+      retryCount: Math.max(...result.agentRuns.map((run) => run.retry_count), 0),
+      durationMs,
+      blockedReasons: [],
+      safeSummary: completed
+        ? `Provider Pipeline 预览完成：${result.agentRuns.length} 个 Agent 运行，生成 ${result.commands.length} 条安全写入计划，未写入飞书。`
+        : `Provider Pipeline 预览未完成：${result.failedAgent ?? "unknown_agent"} 阶段失败，未写入飞书。`,
+      finalStatus: result.finalStatus,
+      completed,
+      failedAgent: result.failedAgent ?? null,
+      agentRunCount: result.agentRuns.length,
+      snapshotUpdated,
+      realWrites: false,
+    };
+  } catch (err: unknown) {
+    const mapped = mapProviderAdapterError(err);
     return {
       mode: "execute",
       status: "failed",
@@ -237,9 +303,15 @@ export async function runLiveCandidateProviderAgentDemo(
       commandCount: null,
       agentRunStatus: null,
       retryCount: null,
-      durationMs: 0,
+      durationMs: Date.now() - start,
       blockedReasons: [],
-      safeSummary: "Provider Agent 预览运行失败，请稍后重试。",
+      safeSummary: mapped.safeMessage,
+      finalStatus: null,
+      completed: false,
+      failedAgent: null,
+      agentRunCount: null,
+      snapshotUpdated: false,
+      realWrites: false,
     };
   }
 }

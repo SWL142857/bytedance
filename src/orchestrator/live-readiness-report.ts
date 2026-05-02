@@ -32,7 +32,7 @@ export interface LiveReadinessReportInput {
   invalidWriteCommands: string[];
 }
 
-const EXPECTED_LIVE_MVP_WRITE_COMMAND_COUNT = 20;
+const EXPECTED_LIVE_MVP_WRITE_COMMAND_COUNT = 24;
 
 export function buildLiveReadinessReport(
   input: LiveReadinessReportInput,

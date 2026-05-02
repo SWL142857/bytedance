@@ -137,6 +137,66 @@ export function generateSetupPlan(): PlanResult {
   return { commands, unsupportedFields };
 }
 
+function buildFieldUpdateCommand(
+  table: TableDef,
+  field: FieldDef,
+  unsupported: UnsupportedFieldError[],
+): BaseCommandSpec | null {
+  const context: FieldMappingContext = { sourceTable: table };
+  const mapping = mapFieldDef(field, context);
+
+  if (isUnsupported(mapping)) {
+    unsupported.push({
+      tableName: table.name,
+      fieldName: field.name,
+      fieldType: mapping.fieldType,
+      reason: mapping.reason,
+    });
+    return null;
+  }
+
+  const fieldJsonStr = JSON.stringify(mapping.fieldJson);
+  const args = [
+    "base",
+    "+field-update",
+    "--base-token",
+    BASE_TOKEN_PLACEHOLDER,
+    "--table-id",
+    table.name,
+    "--field-id",
+    field.name,
+    "--json",
+    fieldJsonStr,
+  ];
+  const redactedArgs = [...args];
+
+  return {
+    description: `Update field "${field.name}" in table "${table.name}"`,
+    command: "lark-cli",
+    args,
+    redactedArgs,
+    needsBaseToken: true,
+    writesRemote: true,
+  };
+}
+
+export function generateSchemaMigrationPlan(): PlanResult {
+  const commands: BaseCommandSpec[] = [];
+  const unsupportedFields: UnsupportedFieldError[] = [];
+
+  for (const table of ALL_TABLES) {
+    for (const field of table.fields) {
+      if (field.type !== "select") continue;
+      const fieldCmd = buildFieldUpdateCommand(table, field, unsupportedFields);
+      if (fieldCmd) {
+        commands.push(fieldCmd);
+      }
+    }
+  }
+
+  return { commands, unsupportedFields };
+}
+
 export interface SeedData {
   tableName: string;
   displayName: string;
