@@ -20,11 +20,11 @@ const RESULT: CandidatePipelineResult = {
   agentRuns: [
     {
       run_id: "run_001",
-      agent_name: "resume_parser",
+      agent_name: "resume_extraction",
       entity_type: "candidate",
       entity_ref: "cand_001",
       input_summary: "candidateId=cand_001 resumeLength=12 status=new",
-      prompt_template_id: "resume_parser_v1",
+      prompt_template_id: "extraction_v1",
       git_commit_hash: "abc123",
       status_before: "new",
       status_after: "parsed",
@@ -35,7 +35,7 @@ const RESULT: CandidatePipelineResult = {
   ],
   finalStatus: "parsed",
   completed: false,
-  failedAgent: "screening",
+  failedAgent: "screening_reviewer",
 };
 
 describe("runtime-dashboard snapshot", () => {
@@ -52,6 +52,18 @@ describe("runtime-dashboard snapshot", () => {
     assert.equal(snapshot.org_overview.safety.external_model_calls, false);
     assert.ok(snapshot.work_events.length >= 2);
     assert.equal(snapshot.work_events[0]?.agent_name, "数据分析");
+    assert.equal(snapshot.work_events[1]?.agent_name, "信息抽取");
+  });
+
+  it("runtime org overview uses the 7-agent roster", () => {
+    const snapshot = buildRuntimeDashboardSnapshot(RESULT, {
+      generatedAt: "2026-04-27T10:00:00.000Z",
+      source: "deterministic",
+      externalModelCalls: false,
+    });
+
+    const names = snapshot.org_overview.agents.map((a) => a.agent_name);
+    assert.deepEqual(names, ["HR 协调", "简历录入", "信息抽取", "图谱构建", "图谱复核", "面试准备", "数据分析"]);
   });
 
   it("stage_counts only counts the finalStatus stage for a single candidate", () => {

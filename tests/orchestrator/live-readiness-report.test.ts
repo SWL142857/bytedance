@@ -31,7 +31,7 @@ function buildResolvedRecord(
   };
 }
 
-const sampleCommands20 = Array.from({ length: 20 }, (_, i) =>
+const sampleCommands24 = Array.from({ length: 24 }, (_, i) =>
   buildCommand({ description: `Command ${i + 1}` }),
 );
 
@@ -52,7 +52,7 @@ function buildInput(
       }),
     ],
     requiredRecordCount: 2,
-    planCommands: sampleCommands20,
+    planCommands: sampleCommands24,
     planError: null,
     invalidWriteCommands: [],
     ...overrides,
@@ -60,13 +60,13 @@ function buildInput(
 }
 
 describe("buildLiveReadinessReport — sample mode ready", () => {
-  it("returns ready with plannedWriteCount=20", () => {
+  it("returns ready with plannedWriteCount=24", () => {
     const report = buildLiveReadinessReport(buildInput());
 
     assert.equal(report.ready, true);
     assert.equal(report.mode, "readonly");
     assert.equal(report.resolutionMode, "sample");
-    assert.equal(report.plannedWriteCount, 20);
+    assert.equal(report.plannedWriteCount, 24);
     assert.equal(report.resolvedRecordCount, 2);
     assert.equal(report.requiredRecordCount, 2);
     assert.equal(report.safeToExecuteLiveWrites, false);
@@ -248,16 +248,16 @@ describe("buildLiveReadinessReport — plan generation failure", () => {
   it("returns ready=false when plan command count is not the MVP expected count", () => {
     const report = buildLiveReadinessReport(
       buildInput({
-        planCommands: sampleCommands20.slice(0, 19),
+        planCommands: sampleCommands24.slice(0, 23),
         planError: null,
       }),
     );
 
     assert.equal(report.ready, false);
-    assert.equal(report.plannedWriteCount, 19);
+    assert.equal(report.plannedWriteCount, 23);
     const plan = report.checks.find((c) => c.name === "Write Plan")!;
     assert.equal(plan.status, "fail");
-    assert.match(plan.summary, /expected 20/);
+    assert.match(plan.summary, /expected 24/);
   });
 });
 

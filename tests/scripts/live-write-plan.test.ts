@@ -71,7 +71,7 @@ describe("live write plan — sample mode", () => {
     assert.equal(result.status, 0);
     assert.match(result.stdout, /Resolution source: sample/);
     assert.match(result.stdout, /Resolved records: 2/);
-    assert.match(result.stdout, /Total commands: 20/);
+    assert.match(result.stdout, /Total commands: 24/);
     assert.match(result.stdout, /writesRemote: true/);
     assert.ok(!result.stdout.includes("--json"), "Must not print command args");
     assert.ok(!result.stdout.includes("--base-token"), "Must not print token args");

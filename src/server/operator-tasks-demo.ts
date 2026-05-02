@@ -95,6 +95,6 @@ export function buildOperatorTasksOverview(): OperatorTasksOverviewView {
       external_model_calls: false,
       demo_mode: true,
     },
-    notice: "操作员控制台尚处于 Phase 6.2 准备阶段，仅展示只读任务清单；真实执行需要后续阶段开放并经人工确认。",
+    notice: "操作员控制台当前为本地演示模式，仅展示只读任务清单；真实写入执行需要后续阶段开放并经人工确认。",
   };
 }

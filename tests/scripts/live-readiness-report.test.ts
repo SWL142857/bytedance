@@ -46,7 +46,7 @@ describe("live readiness report script — sample mode", () => {
     assert.match(result.stdout, /Resolution Mode: sample/);
     assert.match(result.stdout, /Resolved Records: 2/);
     assert.match(result.stdout, /Required Records: 2/);
-    assert.match(result.stdout, /Planned Write Count: 20/);
+    assert.match(result.stdout, /Planned Write Count: 24/);
     assert.match(result.stdout, /Safe to Execute Live Writes: false/);
     assert.match(result.stdout, /--- Checks ---/);
     assert.match(result.stdout, /\[(PASS|WARN)\] Config:/);

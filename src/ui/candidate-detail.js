@@ -1,4 +1,4 @@
-import { SAFE_ERROR_MSG } from "./constants.js";
+import { SAFE_ERROR_MSG, UI_MESSAGES } from "./constants.js";
 import { esc, badgeHtml, errorHtml } from "./helpers.js";
 
 let _currentLinkId = null;
@@ -57,7 +57,7 @@ function renderDryRunZone(container) {
   container.innerHTML =
     '<div class="detail-zone dryrun-zone">' +
     '<div class="detail-zone-title">确定性 Agent 预演</div>' +
-    '<div class="detail-zone-desc">使用内置确定性模型运行完整 pipeline，不调用外部模型，不写飞书。</div>' +
+    '<div class="detail-zone-desc">使用内置确定性模型运行完整 pipeline，不调用外部模型，不写飞书。<br><span style="color:var(--accent-orange)">' + UI_MESSAGES.BOUNDARY_NO_AUTO_HIRE + '</span></div>' +
     '<div class="detail-zone-result" id="detail-dryrun-result"></div>' +
     '<button type="button" class="detail-action-btn" id="detail-dryrun-btn">运行 Agent 预演</button>' +
     '</div>';
@@ -72,7 +72,7 @@ function renderProviderPreviewZone(container) {
   container.innerHTML =
     '<div class="detail-zone provider-zone">' +
     '<div class="detail-zone-title">Provider Agent 预览</div>' +
-    '<div class="detail-zone-desc">使用外部模型运行 Resume Parser，需输入确认短语。不写飞书。</div>' +
+    '<div class="detail-zone-desc">使用外部模型运行完整 P3 Provider Pipeline（简历录入 → 信息抽取 → 图谱构建 → 图谱复核 → 面试准备 → HR 协调），需输入确认短语。不写飞书。<br><span style="color:var(--accent-orange)">' + UI_MESSAGES.BOUNDARY_NO_AUTO_HIRE + '</span></div>' +
     '<div class="detail-zone-result" id="detail-provider-result"></div>' +
     '<div class="detail-confirm-row">' +
     '<input type="text" class="detail-confirm-input" id="detail-provider-confirm" placeholder="输入确认短语..." autocomplete="off">' +
@@ -96,7 +96,7 @@ function renderWritePlanZone(container) {
   container.innerHTML =
     '<div class="detail-zone writeplan-zone">' +
     '<div class="detail-zone-title">写回计划摘要（只读）</div>' +
-    '<div class="detail-zone-desc">生成确定性 pipeline 的写入计划，不执行真实写入。仅展示审阅信息。</div>' +
+    '<div class="detail-zone-desc">生成确定性 pipeline 的写入计划，不执行真实写入。仅展示审阅信息。<br><span style="color:var(--accent-orange)">' + UI_MESSAGES.BOUNDARY_NO_AUTO_HIRE + '</span></div>' +
     '<div class="detail-zone-result" id="detail-writeplan-result"></div>' +
     '<button type="button" class="detail-action-btn" id="detail-writeplan-btn">生成写回计划摘要</button>' +
     '</div>';
@@ -202,6 +202,9 @@ function runProviderPreviewFromDetail(confirmText, btnEl, inputEl) {
       let msg = "";
       if (data.status === "success") {
         msg = '<div class="detail-result-ok">Provider 预览完成：' + esc(data.safeSummary || "") + '</div>';
+        if (data.failedAgent) {
+          msg += '<div class="detail-result-error">失败节点：' + esc(data.failedAgent) + '</div>';
+        }
       } else if (data.status === "blocked") {
         msg = '<div class="detail-result-blocked">预览未执行：' + esc(data.safeSummary || "") + '</div>';
         if (data.blockedReasons && data.blockedReasons.length) {
@@ -213,6 +216,9 @@ function runProviderPreviewFromDetail(confirmText, btnEl, inputEl) {
         }
       } else {
         msg = '<div class="detail-result-error">预览失败：' + esc((data && data.safeSummary) || SAFE_ERROR_MSG) + '</div>';
+        if (data && data.failedAgent) {
+          msg += '<div class="detail-result-error">失败节点：' + esc(data.failedAgent) + '</div>';
+        }
       }
       if (resultEl) resultEl.innerHTML = msg;
     })

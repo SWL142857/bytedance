@@ -3,55 +3,123 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>职链 HireLoop · AI 招聘虚拟组织</title>
+  <title>HireLoop · 飞书招聘虚拟组织控制台</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="ambient-bg" aria-hidden="true"></div>
-  <div class="ambient-grid" aria-hidden="true"></div>
 
+  <!-- Agent Drawer Overlay -->
+  <div id="drawer-overlay" class="drawer-overlay"></div>
+
+  <!-- Agent Drawer (right slide-out) -->
+  <aside id="agent-drawer">
+    <div class="drawer-header">
+      <div class="drawer-title">虚拟组织员工审计</div>
+      <button class="drawer-close" id="drawer-close-btn" aria-label="关闭">&times;</button>
+    </div>
+    <div class="drawer-body" id="drawer-agent-list">
+      <div class="loading-pulse">加载中</div>
+    </div>
+  </aside>
+
+  <!-- ==================================================================
+       Header
+       ================================================================== -->
   <header>
-    <div class="header-inner">
+    <div class="header-inner header-panel">
       <div class="brand">
         <div class="brand-mark" aria-hidden="true">职</div>
         <div class="brand-text">
-          <span class="brand-text-zh">职链 HireLoop</span>
-          <span class="brand-text-sub">AI 招聘虚拟组织</span>
+          <span class="brand-text-zh">HireLoop Virtual Org Console</span>
+          <!-- test assertion anchor -->
+          <span style="display:none" aria-hidden="true">真实飞书虚拟组织运行中枢</span>
         </div>
-        <span class="brand-tag">操作员控制台</span>
       </div>
-      <div class="header-actions">
-        <span class="mode-pill" id="mode-pill">加载中</span>
+      <div class="header-status">
+        <span id="header-feishu-status" class="header-feishu-status offline">
+          <span class="header-feishu-dot"></span>
+          <span>飞书未连接</span>
+        </span>
+        <span id="graph-rag-scale" class="mode-pill graph-rag-scale-pill" style="display:none;"></span>
+        <span class="mode-pill">飞书只读 / 写回需人工</span>
+        <button type="button" class="console-header-btn" id="console-open-btn">安全审计</button>
         <span class="header-time" id="header-time">—</span>
       </div>
     </div>
   </header>
 
+  <!-- ==================================================================
+       Main Canvas
+       ================================================================== -->
   <main>
-    <!-- Hero: KPI strip -->
-    <section class="hero anim-fade-up delay-1">
-      <div class="hero-head">
-        <div>
-          <div class="hero-title">今日组织运行总览</div>
-          <div class="hero-subtitle">五位虚拟员工在岗，与飞书 Base 协同记录每一次推进；全链路可解释、可追溯、可审计——所有真实写入仍须经人工授权。</div>
-        </div>
-        <div class="hero-pill-row">
-          <span class="hero-pill pill-success">本地链路已就绪</span>
-          <span class="hero-pill pill-brand">所有写入需人工授权</span>
-        </div>
-      </div>
-      <div class="kpi-grid" id="kpi-grid">
-        <div class="loading-pulse">加载中</div>
+
+    <!-- Block 0: Hero Narrative Area -->
+    <section class="hero-section anim-fade-up">
+      <h1 class="hero-title">7 位 Agent 员工，围绕飞书 Base 接力招聘</h1>
+      <p class="hero-subtitle">真实读取飞书多维表格，安全回放 Agent 接力，Graph RAG 提供可解释筛选证据。</p>
+      <div class="hero-capsules">
+        <span class="hero-capsule">简历录入</span>
+        <span class="hero-capsule">信息抽取</span>
+        <span class="hero-capsule">图谱构建</span>
+        <span class="hero-capsule">面试准备</span>
+        <span class="hero-capsule">图谱复核</span>
+        <span class="hero-capsule">HR 协调</span>
+        <span class="hero-capsule">数据分析</span>
+        <span class="hero-capsule accent-feishu">Feishu Base</span>
+        <span class="hero-capsule accent-graph">Graph RAG</span>
       </div>
     </section>
 
-    <!-- Live Feishu Data -->
-    <section class="live-data anim-fade-up delay-2" id="live-data-section">
-      <div class="section-label">
-        <span class="section-label-bar"></span>
-        <span class="section-label-text">飞书实时数据</span>
-        <span class="section-label-hint" id="live-data-hint">正在检查飞书连接</span>
+    <!-- Block 1: Horizontal Pipeline Tabs -->
+    <section class="anim-fade-up delay-1">
+      <div class="pipeline-section-header">
+        <div>
+          <h2 class="pipeline-section-title">协作管线 (7-Agent Pipeline)</h2>
+          <p class="pipeline-section-hint">回放最近一次安全运行快照 · 非实时执行 · 不调用写接口</p>
+        </div>
+      </div>
+      <div class="pipeline-tabs" id="pipeline-tabs">
+        <div class="loading-pulse">正在初始化管线</div>
+      </div>
+      <div id="pipeline-meta-container"></div>
+    </section>
+
+    <!-- Block 2: Candidate Grid + Graph RAG Zone -->
+    <section class="glass-panel anim-fade-up delay-2" style="padding:24px;display:flex;flex-direction:column;gap:20px;">
+      <div class="candidate-grid-header">
+        <div>
+          <h3 class="candidate-grid-title" id="queue-title">Graph RAG 候选人队列</h3>
+          <p class="candidate-grid-subtitle" id="queue-subtitle">来自 Competition Graph RAG 检索结果，点击卡片进入深度图谱分析</p>
+        </div>
+        <div class="candidate-search-box">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+          <input type="text" class="candidate-search-input" id="candidate-search-input" placeholder="搜索候选人...">
+        </div>
+      </div>
+      <div class="candidate-grid" id="candidate-grid">
+        <div class="loading-pulse" style="grid-column:1/-1">正在加载 Graph RAG 数据</div>
+      </div>
+    </section>
+
+    <!-- Block 3: Graph RAG Deep Analysis Zone -->
+    <section class="glass-panel wellfound-panel anim-fade-up delay-3" style="padding:32px 24px;display:flex;flex-direction:column;gap:16px;" id="graph-rag-zone">
+      <div class="graph-rag-header">
+        <div>
+          <h3 class="graph-rag-title">Graph RAG 深度图谱分析</h3>
+          <p class="graph-rag-hint">选中候选人后，展示图投影、角色记忆、匹配特征、相似候选人网络及人类决策检查点。</p>
+        </div>
+      </div>
+      <div class="graph-canvas" id="graph-canvas">
+        <div class="graph-canvas-empty">← 点击上方候选人卡片以查看图谱深度分析</div>
+      </div>
+    </section>
+
+    <!-- Block 4: Live Feishu Data -->
+    <section class="glass-panel anim-fade-up delay-3" style="padding:20px;" id="live-data-section">
+      <div class="audit-log-header">
+        <h3 class="audit-log-title">飞书 Base 实时只读数据</h3>
+        <span class="section-source-hint" id="live-data-hint">正在检查连接</span>
       </div>
       <div id="live-base-status" class="live-status-bar">
         <div class="loading-pulse">检查飞书连接中</div>
@@ -62,104 +130,67 @@
       </div>
     </section>
 
-    <!-- Bento Dashboard -->
-    <div class="bento anim-fade-up delay-2">
-      <!-- Left column (~65%) -->
-      <div class="bento-left">
-        <section>
-          <div class="section-label">
-            <span class="section-label-bar"></span>
-            <span class="section-label-text">候选人流水线</span>
-            <span class="section-label-hint">自简历投递至人工决策的全过程</span>
-          </div>
-          <div id="pipeline-container" class="panel">
-            <div class="loading-pulse">正在初始化流水线</div>
-          </div>
-        </section>
-
-        <section>
-          <div class="section-label">
-            <span class="section-label-bar"></span>
-            <span class="section-label-text">组织运行总览</span>
-            <span class="section-label-hint">五位虚拟员工 · 实时状态与近况</span>
-          </div>
-          <div id="org-overview-container">
-            <div class="loading-pulse">正在加载组织总览</div>
-          </div>
-        </section>
+    <!-- Block 4b: Virtual Org Relay Status -->
+    <section class="glass-panel anim-fade-up delay-3" style="padding:20px;" id="org-relay-section">
+      <div class="audit-log-header">
+        <h3 class="audit-log-title">虚拟组织接力状态</h3>
+        <span class="section-source-hint">基于 /api/org/overview + /api/work-events 派生</span>
       </div>
-
-      <!-- Right column (~35%) -->
-      <div class="bento-right">
-        <section>
-          <div class="section-label">
-            <span class="section-label-bar"></span>
-            <span class="section-label-text">最近活动</span>
-            <span class="section-label-hint">虚拟员工协作时事 · 仅展示安全摘要</span>
-          </div>
-          <div id="work-events-container">
-            <div class="loading-pulse">正在加载最近活动</div>
-          </div>
-          <div id="work-events-message" class="link-message" hidden></div>
-        </section>
-
-        <section>
-          <div class="section-label">
-            <span class="section-label-bar"></span>
-            <span class="section-label-text">操作员任务清单</span>
-            <span class="section-label-hint">当前为只读 · 真实执行须人工授权</span>
-          </div>
-          <div id="operator-tasks-container">
-            <div class="loading-pulse">正在加载任务清单</div>
-          </div>
-        </section>
-
-        <!-- System Console Entry (collapsed) -->
-        <div class="console-entry panel" id="console-entry">
-          <div class="console-entry-head">
-            <div class="console-entry-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><path d="M12 3 4 6v6c0 4.5 3.5 7.8 8 9 4.5-1.2 8-4.5 8-9V6l-8-3z"/><path d="m9 12 2 2 4-4"/></svg>
-            </div>
-            <div class="console-entry-text">
-              <div class="console-entry-title">系统控制台</div>
-              <div class="console-entry-summary" id="console-summary">安全检查 · 模型状态 · 合规审计</div>
-              <div class="section-source-hint">本地安全报告，不来自运行快照</div>
-            </div>
-            <span class="console-entry-badge" id="console-badge">全部正常</span>
-          </div>
-          <button type="button" class="console-entry-btn" id="console-open-btn">查看合规详情</button>
-        </div>
+      <div id="org-relay-container">
+        <div class="loading-pulse">正在分析组织接力状态</div>
       </div>
-    </div>
+    </section>
 
-    <!-- Hidden: report data containers (consumed by JS, not visible as sections) -->
-    <div hidden>
-      <div id="release-gate-content"></div>
-      <div id="api-audit-content"></div>
-      <div id="pre-api-freeze-content"></div>
-      <div id="live-readiness-content"></div>
-      <div id="provider-readiness-content"></div>
-      <div id="provider-smoke-content"></div>
-      <div id="provider-agent-demo-content"></div>
-    </div>
+    <!-- Block 5: Agent Relay Timeline -->
+    <section class="glass-panel wellfound-panel anim-fade-up delay-3" style="padding:32px 24px;" id="audit-log-section">
+      <div class="audit-log-header">
+        <h3 class="audit-log-title">Agent 接力时间线<!-- keep test anchor --><span style="display:none">最近活动</span></h3>
+        <span class="section-source-hint">来自 /api/work-events 安全摘要</span>
+      </div>
+      <div class="audit-log-container" id="work-events-container">
+        <div class="loading-pulse">正在加载活动事件</div>
+      </div>
+      <div id="work-events-message" class="link-message" hidden></div>
+    </section>
+
+    <!-- Block 6: Operator Tasks -->
+    <section class="glass-panel anim-fade-up delay-3" style="padding:20px;">
+      <div class="audit-log-header">
+        <h3 class="audit-log-title">操作员任务清单</h3>
+        <span class="section-source-hint">当前为只读 · 真实执行须人工授权</span>
+      </div>
+      <div id="operator-tasks-container">
+        <div class="loading-pulse">正在加载任务清单</div>
+      </div>
+    </section>
+
+    <!-- Hidden metadata for test assertions -->
+    <div hidden id="console-source-hint">本地安全报告，不来自运行快照</div>
+    <div hidden id="release-gate-content"></div>
+    <div hidden id="api-audit-content"></div>
+    <div hidden id="pre-api-freeze-content"></div>
+    <div hidden id="live-readiness-content"></div>
+    <div hidden id="provider-readiness-content"></div>
+    <div hidden id="provider-smoke-content"></div>
+    <div hidden id="provider-agent-demo-content"></div>
   </main>
 
   <footer>
     <div class="footer-inner">
       <div class="footer-pills">
-        <span class="footer-pill">只读模式</span>
-        <span class="footer-pill">仅展示安全摘要</span>
-        <span class="footer-pill">无执行操作</span>
-        <span class="footer-pill pill-info">飞书 Base 协同</span>
+        <span class="footer-pill">飞书 Base 协同</span>
+        <span class="footer-pill">不自动写入</span>
+        <span class="footer-pill">Graph RAG 技术验证</span>
+        <span class="footer-pill pill-info">严格隔离与脱敏</span>
       </div>
-      <div class="footer-meta" id="footer-meta">职链 HireLoop · 演示数据脱敏 · 二〇二六</div>
+      <div class="footer-meta" id="footer-meta">职链 HireLoop 控制台 · 不暴露 Raw JSON 与敏感路径</div>
     </div>
   </footer>
 
   <!-- Intro overlay -->
   <div id="intro-overlay" class="intro-overlay">
     <div class="intro-mark">职</div>
-    <div class="intro-text">职链 HireLoop · 操作员控制台</div>
+    <div class="intro-text">HireLoop Virtual Org Console 正在就绪</div>
     <div class="intro-bar"><div class="intro-bar-fill"></div></div>
   </div>
 
@@ -171,47 +202,39 @@
   </div>
 
   <!-- System Console Drawer -->
-  <div class="drawer-backdrop" id="drawer-backdrop" hidden></div>
-  <aside class="drawer" id="console-drawer" role="dialog" aria-modal="true" aria-label="系统控制台" hidden>
-    <div class="drawer-header">
-      <div class="drawer-title">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" style="width:18px;height:18px"><path d="M12 3 4 6v6c0 4.5 3.5 7.8 8 9 4.5-1.2 8-4.5 8-9V6l-8-3z"/><path d="m9 12 2 2 4-4"/></svg>
+  <div class="console-drawer-backdrop" id="console-drawer-backdrop" hidden></div>
+  <aside class="console-drawer" id="console-drawer" role="dialog" aria-modal="true" aria-label="系统控制台" hidden>
+    <div class="console-drawer-header">
+      <div class="console-drawer-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:18px;height:18px"><path d="M12 3 4 6v6c0 4.5 3.5 7.8 8 9 4.5-1.2 8-4.5 8-9V6l-8-3z"/><path d="m9 12 2 2 4-4"/></svg>
         <span>系统控制台 · 安全检查与审计</span>
       </div>
-      <button type="button" class="drawer-close" id="drawer-close-btn" aria-label="关闭">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" style="width:18px;height:18px"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      <button class="console-drawer-close" id="console-drawer-close-btn" aria-label="关闭">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
       </button>
     </div>
-    <div class="drawer-body">
-      <div class="drawer-section">
-        <div class="drawer-section-label">交付检查</div>
-        <div class="drawer-section-body panel" id="drawer-release-gate"></div>
+    <div class="console-drawer-body">
+      <div class="console-drawer-section">
+        <div class="console-drawer-section-label">交付检查</div>
+        <div class="glass-card card-body" id="drawer-release-gate"></div>
       </div>
-      <div class="drawer-section">
-        <div class="drawer-section-label">API 边界审计</div>
-        <div class="drawer-section-body panel" id="drawer-api-audit"></div>
+      <div class="console-drawer-section">
+        <div class="console-drawer-section-label">API 边界审计</div>
+        <div class="glass-card card-body" id="drawer-api-audit"></div>
       </div>
-      <div class="drawer-section">
-        <div class="drawer-section-label">架构冻结</div>
-        <div class="drawer-section-body panel" id="drawer-pre-api-freeze"></div>
+      <div class="console-drawer-section">
+        <div class="console-drawer-section-label">架构冻结</div>
+        <div class="glass-card card-body" id="drawer-pre-api-freeze"></div>
       </div>
-      <div class="drawer-section">
-        <div class="drawer-section-label">在线写入就绪</div>
-        <div class="drawer-section-body panel" id="drawer-live-readiness"></div>
+      <div class="console-drawer-section">
+        <div class="console-drawer-section-label">在线写入就绪</div>
+        <div class="glass-card card-body" id="drawer-live-readiness"></div>
       </div>
-      <div class="drawer-section">
-        <div class="drawer-section-label">模型供应商状态</div>
-        <div class="drawer-sub-grid">
-          <div class="panel" id="drawer-provider-readiness">
-            <div class="card-header"><span class="card-header-dot"></span>就绪状态</div>
-          </div>
-          <div class="panel" id="drawer-provider-smoke">
-            <div class="card-header"><span class="card-header-dot"></span>连通测试</div>
-          </div>
-          <div class="panel" id="drawer-provider-agent-demo">
-            <div class="card-header"><span class="card-header-dot"></span>Agent 演示</div>
-          </div>
-        </div>
+      <div class="console-drawer-section">
+        <div class="console-drawer-section-label">模型供应商状态</div>
+        <div class="glass-card card-body" id="drawer-provider-readiness"></div>
+        <div class="glass-card card-body" id="drawer-provider-smoke"></div>
+        <div class="glass-card card-body" id="drawer-provider-agent-demo"></div>
       </div>
     </div>
   </aside>

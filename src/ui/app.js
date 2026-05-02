@@ -1,15 +1,15 @@
 import { setHeaderTime } from "./helpers.js";
-import { renderDataSource } from "./safety-badge.js";
-import { mountIntroOverlay, mountDrawer } from "./drawer.js";
+import { mountIntroOverlay } from "./drawer.js";
 import { mountLiveCapsule, renderWorkEvents } from "./work-events.js";
-import { renderHero, renderOrgOverview, renderPipeline } from "./pipeline.js";
+import { renderPipeline } from "./pipeline.js";
+import { setupAgentDrawer } from "./agent-cards.js";
 import { renderOperatorTasks } from "./operator-tasks.js";
+import { initGraphRagSearch } from "./graph-rag.js";
+import { renderOrgRelay } from "./org-relay.js";
+import { mountRelayPlayer } from "./agent-relay-player.js";
 import {
-  consoleHealthState,
-  renderDrawerError,
   safeCatch,
   updateConsoleBadge,
-  REPORT_DRAWER_MAP,
   renderReleaseGate,
   renderApiAudit,
   renderPreApiFreeze,
@@ -21,68 +21,130 @@ import {
 import { loadLiveData } from "./live-records.js";
 import { initCandidateDetail } from "./candidate-detail.js";
 
-// Expose for backward compat with tests
+// Expose for test backward compat + runtime snapshot refresh
 window._hireloopReloadAfterRun = function () {
   fetch("/api/org/overview")
     .then(function (res) { return res.json(); })
     .then(function (org) {
-      renderDataSource(org);
-      renderOrgOverview(org, []);
+      // Refresh agent drawer data
+      setupAgentDrawer(org);
     }).catch(function () {});
   fetch("/api/demo/pipeline")
     .then(function (res) { return res.json(); })
     .then(function (data) {
-      renderPipeline(data, null);
+      fetch("/api/org/overview")
+        .then(function (r) { return r.json(); })
+        .then(function (org) { renderPipeline(data, org); })
+        .catch(function () { renderPipeline(data, null); });
     }).catch(function () {});
   fetch("/api/work-events")
     .then(function (res) { return res.json(); })
-    .then(function (events) {
-      renderWorkEvents(events);
-    }).catch(function () {});
+    .then(renderWorkEvents).catch(function () {});
 };
+
+function updateFeishuHeaderStatus(status) {
+  var el = document.getElementById("header-feishu-status");
+  if (!el) return;
+  if (status && status.readEnabled && status.blockedReasons && status.blockedReasons.length === 0) {
+    el.className = "header-feishu-status online";
+    el.querySelector("span:last-child").textContent = "飞书已连接";
+  } else {
+    el.className = "header-feishu-status offline";
+    el.querySelector("span:last-child").textContent = "飞书未连接";
+  }
+}
+
+function updateGraphRagScale(overview) {
+  var el = document.getElementById("graph-rag-scale");
+  if (!el || !overview) return;
+  var candidates = overview.candidateCount ?? overview.totalCandidates;
+  var evidence = overview.evidenceCount ?? overview.totalEvidence;
+  var roles = overview.roleCount ?? overview.totalRoles;
+  if (candidates != null || evidence != null || roles != null) {
+    var parts = [];
+    if (candidates != null) parts.push("图谱: " + candidates + " 候选人");
+    if (evidence != null) parts.push(evidence + " 证据");
+    if (roles != null) parts.push(roles + " 岗位");
+    el.textContent = parts.join(" · ");
+    el.style.display = "";
+  }
+}
 
 function load() {
   mountIntroOverlay();
-  mountDrawer();
   setHeaderTime();
   setInterval(setHeaderTime, 30000);
 
-  // Live data fetch (fire-and-forget, non-blocking)
+  // Fire-and-forget
   loadLiveData();
   initCandidateDetail();
 
+  // Feishu header status
+  fetch("/api/live/base-status")
+    .then(function (res) { return res.json(); })
+    .then(updateFeishuHeaderStatus)
+    .catch(function () {});
+
+  // Graph RAG overview (for header scale)
+  fetch("/api/competition/overview")
+    .then(function (res) { return res.json(); })
+    .then(updateGraphRagScale)
+    .catch(function () {});
+
+  var pipelineRequest = fetch("/api/demo/pipeline").then(function (res) { return res.json(); });
+  pipelineRequest
+    .then(function (pipelineData) {
+      renderPipeline(pipelineData, null);
+    })
+    .catch(safeCatch("pipeline-tabs"));
+
+  // Main data: org overview + work events + pipeline
   Promise.all([
     fetch("/api/org/overview").then(function (r) { return r.json(); }),
     fetch("/api/work-events").then(function (r) { return r.json(); }),
   ]).then(function (results) {
-    const orgData = results[0];
-    const eventsData = results[1];
-    renderDataSource(orgData);
-    renderHero(orgData, eventsData);
-    renderOrgOverview(orgData, eventsData);
+    var orgData = results[0];
+    var eventsData = results[1];
+
+    // Setup agent drawer
+    setupAgentDrawer(orgData);
+
+    // Render org relay status
+    renderOrgRelay(orgData, eventsData);
+
+    // Render agent relay timeline
     renderWorkEvents(eventsData);
+
+    // Live capsule
     mountLiveCapsule(eventsData);
 
-    fetch("/api/demo/pipeline")
-      .then(function (res) { return res.json(); })
-      .then(function (data) { renderPipeline(data, orgData); })
-      .catch(safeCatch("pipeline-container"));
+    // Pipeline + pipeline tabs
+    pipelineRequest
+      .then(function (pipelineData) {
+        renderPipeline(pipelineData, orgData);
+        mountRelayPlayer();
+      })
+      .catch(safeCatch("pipeline-tabs"));
   }).catch(function () {
-    const grid = document.getElementById("kpi-grid");
-    if (grid) grid.innerHTML = '<div class="error-msg">信息不可用，请稍后重试</div>';
-    const org = document.getElementById("org-overview-container");
-    if (org) org.innerHTML = '<div class="error-msg">信息不可用，请稍后重试</div>';
-    const ev = document.getElementById("work-events-container");
+    var tabs = document.getElementById("pipeline-tabs");
+    if (tabs) tabs.innerHTML = '<div class="error-msg">信息不可用，请稍后重试</div>';
+    var ev = document.getElementById("work-events-container");
     if (ev) ev.innerHTML = '<div class="error-msg">信息不可用，请稍后重试</div>';
-    const p = document.getElementById("pipeline-container");
-    if (p) p.innerHTML = '<div class="error-msg">信息不可用，请稍后重试</div>';
   });
 
+  // Init Graph RAG search (loads default candidate grid)
+  initGraphRagSearch();
+
+  // Operator tasks
   fetch("/api/operator/tasks")
     .then(function (res) { return res.json(); })
     .then(renderOperatorTasks)
     .catch(safeCatch("operator-tasks-container"));
 
+  // System console drawer (reports)
+  setupConsoleDrawer();
+
+  // Report data for drawer
   fetch("/api/reports/release-gate")
     .then(function (res) { return res.json(); })
     .then(function (d) { renderReleaseGate(d); updateConsoleBadge(); })
@@ -111,6 +173,42 @@ function load() {
     .then(function (res) { return res.json(); })
     .then(function (d) { renderProviderAgentDemo(d); updateConsoleBadge(); })
     .catch(safeCatch("provider-agent-demo-content"));
+}
+
+function setupConsoleDrawer() {
+  // Uses existing drawer.js pattern but with new class names
+  var openBtn = document.getElementById("console-open-btn");
+  var closeBtn = document.getElementById("console-drawer-close-btn");
+  var backdrop = document.getElementById("console-drawer-backdrop");
+  var drawer = document.getElementById("console-drawer");
+
+  function openConsole() {
+    if (!drawer || !backdrop) return;
+    drawer.hidden = false;
+    backdrop.hidden = false;
+    requestAnimationFrame(function () {
+      drawer.classList.add("open");
+      backdrop.classList.add("visible");
+    });
+  }
+
+  function closeConsole() {
+    if (!drawer || !backdrop) return;
+    drawer.classList.remove("open");
+    backdrop.classList.remove("visible");
+    setTimeout(function () {
+      drawer.hidden = true;
+      backdrop.hidden = true;
+    }, 320);
+  }
+
+  if (openBtn) openBtn.addEventListener("click", openConsole);
+  if (closeBtn) closeBtn.addEventListener("click", closeConsole);
+  if (backdrop) backdrop.addEventListener("click", closeConsole);
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") closeConsole();
+  });
 }
 
 load();

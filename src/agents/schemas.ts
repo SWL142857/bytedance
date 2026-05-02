@@ -48,6 +48,61 @@ export interface InterviewKitOutput {
   riskChecks: string[];
 }
 
+// ── P3 Competition Agent Output Schemas ──
+
+export interface IntakeOutput {
+  candidateId: string;
+  resumeRaw: string;
+  targetRole: string;
+  jobDescriptionRaw: string;
+  intakeTimestamp: string;
+  sourceMetadata: {
+    submissionChannel: string | null;
+    languageDetected: string;
+    charCount: number;
+  };
+}
+
+export interface ExtractionOutput {
+  skills: Array<{
+    name: string;
+    canonicalName: string;
+    confidence: number;
+    evidence: string;
+  }>;
+  features: Array<{
+    featureType: string;
+    featureName: string;
+    canonicalName: string;
+    featureValue: string;
+    confidence: number;
+    evidence: string;
+  }>;
+  profile: {
+    yearsOfExperience: string;
+    educationLevel: string;
+    industryBackground: string;
+    leadershipLevel: string;
+    communicationLevel: string;
+    systemDesignLevel: string;
+    structuredSummary: string;
+  };
+}
+
+export interface GraphBuilderOutput {
+  shouldLink: boolean;
+  linkReason: string;
+  sharedSignals: string[];
+}
+
+export interface ReviewerOutput {
+  decisionPred: "select" | "reject";
+  confidence: number;
+  reasonLabel: string;
+  reasonGroup: string;
+  reviewSummary: string;
+}
+
 const FORBIDDEN_KEYS = [
   "reasoning_chain",
   "raw_resume",
@@ -334,5 +389,127 @@ export function parseAnalyticsOutput(value: unknown): AnalyticsOutput {
     bottlenecks: parsedBottlenecks,
     talentPoolSuggestions: parsedTalentPool,
     recommendations: parsedRecommendations,
+  };
+}
+
+// ── P3 Competition Agent Parse Functions ──
+
+function parseNumberField(value: unknown, fieldName: string): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  throw new SchemaValidationError(`${fieldName} must be a finite number`);
+}
+
+// --- Intake ---
+
+export function parseIntakeOutput(value: unknown): IntakeOutput {
+  if (!isObject(value)) throw new SchemaValidationError("IntakeOutput must be an object");
+  const { candidateId, resumeRaw, targetRole, jobDescriptionRaw, intakeTimestamp, sourceMetadata } = value as Record<string, unknown>;
+  if (!isString(candidateId)) throw new SchemaValidationError("candidateId must be a string");
+  if (!isString(resumeRaw)) throw new SchemaValidationError("resumeRaw must be a string");
+  if (!isString(targetRole)) throw new SchemaValidationError("targetRole must be a string");
+  if (!isString(jobDescriptionRaw)) throw new SchemaValidationError("jobDescriptionRaw must be a string");
+  if (!isString(intakeTimestamp)) throw new SchemaValidationError("intakeTimestamp must be a string");
+  if (!isObject(sourceMetadata)) throw new SchemaValidationError("sourceMetadata must be an object");
+  const sm = sourceMetadata as Record<string, unknown>;
+  return {
+    candidateId,
+    resumeRaw,
+    targetRole,
+    jobDescriptionRaw,
+    intakeTimestamp,
+    sourceMetadata: {
+      submissionChannel: sm.submissionChannel !== undefined && sm.submissionChannel !== null ? String(sm.submissionChannel) : null,
+      languageDetected: isString(sm.languageDetected) ? sm.languageDetected : "unknown",
+      charCount: typeof sm.charCount === "number" ? sm.charCount : 0,
+    },
+  };
+}
+
+// --- Extraction ---
+
+function parseExtractionSkill(value: unknown): ExtractionOutput["skills"][number] {
+  if (!isObject(value)) throw new SchemaValidationError("Each skill must be an object");
+  const { name, canonicalName, confidence, evidence } = value as Record<string, unknown>;
+  if (!isString(name)) throw new SchemaValidationError("skill.name must be a string");
+  if (!isString(canonicalName)) throw new SchemaValidationError("skill.canonicalName must be a string");
+  return {
+    name,
+    canonicalName,
+    confidence: parseNumberField(confidence, "skill.confidence"),
+    evidence: isString(evidence) ? evidence : "",
+  };
+}
+
+function parseExtractionFeature(value: unknown): ExtractionOutput["features"][number] {
+  if (!isObject(value)) throw new SchemaValidationError("Each feature must be an object");
+  const { featureType, featureName, canonicalName, featureValue, confidence, evidence } = value as Record<string, unknown>;
+  if (!isString(featureType)) throw new SchemaValidationError("feature.featureType must be a string");
+  if (!isString(featureName)) throw new SchemaValidationError("feature.featureName must be a string");
+  if (!isString(canonicalName)) throw new SchemaValidationError("feature.canonicalName must be a string");
+  return {
+    featureType,
+    featureName,
+    canonicalName,
+    featureValue: isString(featureValue) ? featureValue : "",
+    confidence: parseNumberField(confidence, "feature.confidence"),
+    evidence: isString(evidence) ? evidence : "",
+  };
+}
+
+export function parseExtractionOutput(value: unknown): ExtractionOutput {
+  if (!isObject(value)) throw new SchemaValidationError("ExtractionOutput must be an object");
+  const obj = value as Record<string, unknown>;
+  if (!isArray(obj.skills)) throw new SchemaValidationError("skills must be an array");
+  if (!isArray(obj.features)) throw new SchemaValidationError("features must be an array");
+  const skills = obj.skills.map(parseExtractionSkill);
+  const features = obj.features.map(parseExtractionFeature);
+  const profile = isObject(obj.profile) ? obj.profile as Record<string, unknown> : {};
+  return {
+    skills,
+    features,
+    profile: {
+      yearsOfExperience: isString(profile.yearsOfExperience) ? profile.yearsOfExperience : "unknown",
+      educationLevel: isString(profile.educationLevel) ? profile.educationLevel : "unknown",
+      industryBackground: isString(profile.industryBackground) ? profile.industryBackground : "unknown",
+      leadershipLevel: isString(profile.leadershipLevel) ? profile.leadershipLevel : "unknown",
+      communicationLevel: isString(profile.communicationLevel) ? profile.communicationLevel : "unknown",
+      systemDesignLevel: isString(profile.systemDesignLevel) ? profile.systemDesignLevel : "unknown",
+      structuredSummary: isString(profile.structuredSummary) ? profile.structuredSummary : "",
+    },
+  };
+}
+
+// --- Graph Builder ---
+
+export function parseGraphBuilderOutput(value: unknown): GraphBuilderOutput {
+  if (!isObject(value)) throw new SchemaValidationError("GraphBuilderOutput must be an object");
+  const { shouldLink, linkReason, sharedSignals } = value as Record<string, unknown>;
+  if (typeof shouldLink !== "boolean") throw new SchemaValidationError("shouldLink must be a boolean");
+  if (!isString(linkReason)) throw new SchemaValidationError("linkReason must be a string");
+  const parsedSignals = parseStringArray(sharedSignals, "sharedSignals");
+  return { shouldLink, linkReason, sharedSignals: parsedSignals };
+}
+
+// --- Reviewer ---
+
+export function parseReviewerOutput(value: unknown): ReviewerOutput {
+  if (!isObject(value)) throw new SchemaValidationError("ReviewerOutput must be an object");
+  const { decisionPred, confidence, reasonLabel, reasonGroup, reviewSummary } = value as Record<string, unknown>;
+  if (decisionPred !== "select" && decisionPred !== "reject") {
+    throw new SchemaValidationError(`decisionPred must be "select" or "reject", got ${String(decisionPred)}`);
+  }
+  if (!isString(reasonLabel)) throw new SchemaValidationError("reasonLabel must be a string");
+  if (!isString(reasonGroup)) throw new SchemaValidationError("reasonGroup must be a string");
+  if (!isString(reviewSummary)) throw new SchemaValidationError("reviewSummary must be a string");
+  return {
+    decisionPred,
+    confidence: parseNumberField(confidence, "confidence"),
+    reasonLabel,
+    reasonGroup,
+    reviewSummary,
   };
 }

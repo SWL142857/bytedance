@@ -116,7 +116,7 @@ export const AGENT_RUN_TABLE: TableDef = {
   description: "Audit log for all agent executions — stores evidence, not full reasoning chains",
   fields: [
     { name: "run_id", type: "text", required: true, description: "Unique run identifier (application-generated)" },
-    { name: "agent_name", type: "select", required: true, description: "Which agent ran", options: ["hr_coordinator", "resume_parser", "screening", "interview_kit", "analytics"] },
+    { name: "agent_name", type: "select", required: true, description: "Which agent ran", options: ["hr_coordinator", "resume_intake", "resume_extraction", "screening_reviewer", "interview_kit", "analytics", "graph_builder", "resume_parser", "screening"] },
     { name: "entity_type", type: "select", required: true, description: "Entity being processed", options: ["job", "candidate", "evaluation", "interview_kit", "report"] },
     { name: "entity_ref", type: "text", required: true, description: "Reference ID for the entity" },
     { name: "input_summary", type: "text", required: true, description: "Summary of input, never full resume text" },
@@ -144,7 +144,7 @@ export const WORK_EVENT_TABLE: TableDef = {
       type: "select",
       required: true,
       description: "Which virtual employee produced the event",
-      options: ["hr_coordinator", "resume_parser", "screening", "interview_kit", "analytics"],
+      options: ["hr_coordinator", "resume_intake", "resume_extraction", "screening_reviewer", "interview_kit", "analytics", "graph_builder", "resume_parser", "screening"],
     },
     {
       name: "event_type",

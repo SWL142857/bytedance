@@ -1,6 +1,42 @@
 import type { LlmClient, LlmRequest, LlmResponse } from "./client.js";
 
 const DETERMINISTIC_RESPONSES: Record<string, string> = {
+  // ── P3 Competition agents ──
+  extraction_v1: JSON.stringify({
+    skills: [
+      { name: "Product Management", canonicalName: "Product Management", confidence: 1.0, evidence: "6 years as Product Manager" },
+      { name: "SQL", canonicalName: "SQL", confidence: 0.9, evidence: "SQL and data analysis experience" },
+      { name: "A/B Testing", canonicalName: "A/B Testing", confidence: 0.85, evidence: "A/B testing for product decisions" },
+      { name: "Cross-functional Leadership", canonicalName: "Cross-functional Leadership", confidence: 0.8, evidence: "Led cross-functional teams" },
+    ],
+    features: [
+      { featureType: "experience", featureName: "Product Management Tenure", canonicalName: "PM Tenure", featureValue: "6 years", confidence: 1.0, evidence: "6 years in product management" },
+      { featureType: "capability", featureName: "Data-driven Decision Making", canonicalName: "Data Analysis", featureValue: "SQL, Python, A/B testing", confidence: 0.9, evidence: "SQL and Python for data analysis" },
+      { featureType: "capability", featureName: "Team Leadership", canonicalName: "Team Leadership", featureValue: "Led cross-functional teams", confidence: 0.8, evidence: "Cross-functional team leadership" },
+    ],
+    profile: {
+      yearsOfExperience: "6",
+      educationLevel: "Bachelor's",
+      industryBackground: "Technology",
+      leadershipLevel: "senior",
+      communicationLevel: "proficient",
+      systemDesignLevel: "proficient",
+      structuredSummary: "Candidate has 6 years of product management experience in the technology sector, with strong data analysis skills and proven cross-functional leadership. Well-suited for senior PM roles requiring technical depth and team coordination.",
+    },
+  }),
+  reviewer_v1: JSON.stringify({
+    decisionPred: "select",
+    confidence: 0.85,
+    reasonLabel: "Strong Product Management Fit",
+    reasonGroup: "skill_match",
+    reviewSummary: "Candidate demonstrates 6 years of product management experience with strong data analysis skills (SQL, A/B testing) and cross-functional leadership. Profile aligns well with role requirements for technical depth and product sense. Top neighbors show similar strong-match profiles.",
+  }),
+  graph_builder_v1: JSON.stringify({
+    shouldLink: true,
+    linkReason: "Candidates share senior product leadership and data-driven decision signals.",
+    sharedSignals: ["Product Management", "Data Analysis", "Team Leadership"],
+  }),
+  // ── Legacy agents (retained for backward compat) ──
   resume_parser_v1: JSON.stringify({
     facts: [
       { factType: "work_experience", factText: "5 years as Product Manager at a technology company", sourceExcerpt: null, confidence: "high" },

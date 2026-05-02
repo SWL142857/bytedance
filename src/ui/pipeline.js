@@ -1,247 +1,212 @@
 import {
-  STATE_FLOW,
-  STATE_LABELS,
-  AGENT_DESCRIPTIONS,
-  ICON_USERS,
-  ICON_FLAG,
-  ICON_BOLT,
-  ICON_PULSE,
-  ICON_SHIELD,
+  PIPELINE_ROW1,
+  PIPELINE_ROW2,
+  PIPELINE_STAGE_LABELS,
+  AGENT_NODES,
 } from "./constants.js";
-import {
-  esc,
-  avatarHtml,
-  errorHtml,
-} from "./helpers.js";
-import { buildSafetySubText, safetyRow } from "./safety-badge.js";
+import { esc } from "./helpers.js";
 
-// ── Hero KPI ──
+// ── Pipeline Grid (2 rows × 4 columns) ──
 
-function kpiCardHtml(opts) {
-  return '<div class="kpi-card">' +
-    '<div class="kpi-icon kpi-icon-' + opts.tone + '">' + opts.icon + '</div>' +
-    '<div class="kpi-label">' + esc(opts.label) + '</div>' +
-    '<div class="kpi-value">' + esc(opts.value) +
-      (opts.suffix ? ('<span class="kpi-value-suffix">' + esc(opts.suffix) + '</span>') : '') +
-    '</div>' +
-    '<div class="kpi-foot ' + (opts.footTone ? ('kpi-foot-' + opts.footTone) : '') + '">' +
-      esc(opts.foot) + '</div>' +
-    '</div>';
+var failedAgentStageMap = {
+  "resume_intake": "Intake",
+  "resume_extraction": "Extraction",
+  "graph_builder": "Graph Builder",
+  "interview_kit": "Interview Kit",
+  "screening_reviewer": "Reviewer",
+  "hr_coordinator": "HR Coordinator",
+  "analytics": "Analytics"
+};
+
+var backendStateMap = {
+  "new": "new",
+  "parsed": "Intake",
+  "screened": "Extraction",
+  "interview_kit_ready": "Interview Kit",
+  "decision_pending": "decision_pending",
+  "offer": "decision_pending",
+  "rejected": "decision_pending"
+};
+
+var graphRagStages = ["Graph Builder", "Reviewer"];
+
+function resolveFailedStage(data) {
+  if (!data.completed && data.failedAgent) {
+    return failedAgentStageMap[data.failedAgent] || null;
+  }
+  return null;
 }
 
-export function renderHero(orgData, eventsData) {
-  const grid = document.getElementById("kpi-grid");
-  if (!grid) return;
+function resolveFinalIdx(data) {
+  var failedStage = resolveFailedStage(data);
+  var actualFinalStage = failedStage || backendStateMap[data.finalStatus] || "decision_pending";
+  var fullOrder = PIPELINE_ROW1.concat(PIPELINE_ROW2);
+  var idx = fullOrder.indexOf(actualFinalStage);
+  if (idx === -1) idx = fullOrder.indexOf("decision_pending");
+  if (idx === -1) idx = fullOrder.length - 1;
+  return idx;
+}
 
-  const pipeline = (orgData && orgData.pipeline) || { stage_counts: [] };
-  const stageCounts = Array.isArray(pipeline.stage_counts) ? pipeline.stage_counts : [];
-  let totalCandidates = 0;
-  for (let i = 0; i < stageCounts.length; i++) {
-    totalCandidates += Number(stageCounts[i].count) || 0;
+function hasAnalyticsData(orgData) {
+  if (!orgData || !Array.isArray(orgData.agents)) return false;
+  for (var i = 0; i < orgData.agents.length; i++) {
+    var a = orgData.agents[i];
+    if (a.agent_name === "数据分析") {
+      return hasMeaningfulSummary(a.last_event_summary) || a.status !== "空闲";
+    }
   }
-  let pendingDecision = 0;
-  for (let j = 0; j < stageCounts.length; j++) {
-    if (stageCounts[j].label === "待决策") {
-      pendingDecision = Number(stageCounts[j].count) || 0;
-      break;
+  return false;
+}
+
+function hasMeaningfulSummary(summary) {
+  if (typeof summary !== "string") return false;
+  var text = summary.trim();
+  return text.length > 0 && text !== "暂无活动" && text !== "暂无运行快照";
+}
+
+function agentForStage(stageName) {
+  for (var i = 0; i < AGENT_NODES.length; i++) {
+    if (PIPELINE_STAGE_LABELS[stageName] === AGENT_NODES[i].name) return AGENT_NODES[i];
+  }
+  return null;
+}
+
+function avatarColorClass(agentId) {
+  return "av-titanium";
+}
+
+function renderStageCard(stageName, index, data, finalIdx, analyticsAvailable) {
+  var label = PIPELINE_STAGE_LABELS[stageName] || stageName;
+  var failedStage = resolveFailedStage(data);
+  var isFailedHere = failedStage === stageName;
+  var isGraphRag = graphRagStages.indexOf(stageName) !== -1;
+  var isFeishu = stageName === "new";
+  var isHuman = stageName === "decision_pending";
+  var isAnalytics = stageName === "Analytics";
+  var isAnalyticsReached = isAnalytics && analyticsAvailable;
+  var isReached = index <= finalIdx || isAnalyticsReached;
+  var isCurrent = index === finalIdx;
+  var agent = agentForStage(stageName);
+
+  var cls = "pipeline-card";
+  if (isFailedHere) cls += " is-failed";
+  else if (isCurrent) cls += " is-active";
+  else if (!isReached) cls += " is-pending";
+  cls += " anim-tab-" + index;
+
+  var html = '<div class="' + cls + '" data-stage="' + esc(stageName) + '">';
+
+  // Top row: number + label
+  html += '<div class="pipeline-card-head">';
+  html += '<span class="pipeline-card-num">' + esc(String(index + 1).padStart(2, "0")) + '</span>';
+  html += '<span class="pipeline-card-label">' + esc(label) + '</span>';
+  html += '</div>';
+
+  // Agent line (if has agent)
+  if (agent) {
+    html += '<div class="pipeline-card-agent" data-agent-id="' + esc(agent.id) + '" data-agent-name="' + esc(agent.name) + '">';
+    html += '<span class="pipeline-card-agent-avatar ' + avatarColorClass(agent.id) + '">' + esc(agent.avatarInitial) + '</span>';
+    html += '<span class="pipeline-card-agent-name">' + esc(agent.name) + '</span>';
+    html += '</div>';
+  } else if (isFeishu) {
+    html += '<div class="pipeline-card-source">Feishu Base 数据源</div>';
+  } else if (isHuman) {
+    html += '<div class="pipeline-card-source" style="color:var(--accent-orange)">人类操作员确认</div>';
+  }
+
+  // Status indicator
+  html += '<div class="pipeline-card-status">';
+  html += '<span class="pipeline-card-dot ' + (isFailedHere ? 'dot-failed' : isCurrent ? 'dot-current' : isReached ? 'dot-reached' : 'dot-pending') + '"></span>';
+  if (isFailedHere) html += '<span class="pipeline-card-status-text failed">执行失败</span>';
+  else if (isAnalyticsReached) html += '<span class="pipeline-card-status-text reached">已有快照</span>';
+  else if (isCurrent && data.completed) html += '<span class="pipeline-card-status-text done">已完成</span>';
+  else if (isCurrent) html += '<span class="pipeline-card-status-text active">进行中</span>';
+  else if (isReached) html += '<span class="pipeline-card-status-text reached">已到达</span>';
+  else html += '<span class="pipeline-card-status-text pending">待执行</span>';
+  html += '</div>';
+
+  // Tech badge
+  if (isReached) {
+    if (isFailedHere) {
+      html += '<span class="pipeline-card-badge badge-failed">执行失败</span>';
+    } else if (isFeishu) {
+      html += '<span class="pipeline-card-badge badge-feishu">真实飞书读取</span>';
+    } else if (isGraphRag) {
+      html += '<span class="pipeline-card-badge badge-graphrag">Competition Graph RAG</span>';
+    } else if (isHuman) {
+      html += '<span class="pipeline-card-badge badge-human">等待人工操作</span>';
+    } else if (isAnalytics) {
+      html += '<span class="pipeline-card-badge badge-plan">持续优化分析</span>';
+    } else {
+      html += '<span class="pipeline-card-badge badge-plan">运行快照已到达</span>';
     }
   }
 
-  const agents = (orgData && Array.isArray(orgData.agents)) ? orgData.agents : [];
-  let workingCount = 0;
-  let idleCount = 0;
-  let blockedCount = 0;
-  for (let k = 0; k < agents.length; k++) {
-    const s = agents[k].status;
-    if (s === "工作中") workingCount++;
-    else if (s === "需要人工处理") workingCount++;
-    else if (s === "阻塞") blockedCount++;
-    else idleCount++;
-  }
-
-  const events = Array.isArray(eventsData) ? eventsData : [];
-  let blockedEvents = 0;
-  let dryRunEvents = 0;
-  for (let m = 0; m < events.length; m++) {
-    if (events[m].execution_mode === "blocked") blockedEvents++;
-    if (events[m].execution_mode === "dry_run") dryRunEvents++;
-  }
-
-  const safety = (orgData && orgData.safety) || {};
-  const safetyOk = safety.read_only === true && safety.real_writes === false &&
-    safety.external_model_calls === false;
-
-  let html = "";
-  html += kpiCardHtml({
-    tone: "brand", icon: ICON_USERS,
-    label: "流水线候选人",
-    value: totalCandidates, suffix: "人",
-    foot: "当前阶段分布 · 追踪 " + stageCounts.length + " 个流程状态",
-  });
-  html += kpiCardHtml({
-    tone: "warning", icon: ICON_FLAG,
-    label: "等待人工决策",
-    value: pendingDecision, suffix: "人",
-    foot: pendingDecision > 0 ? "请操作员尽快确认" : "暂无待决策",
-    footTone: pendingDecision > 0 ? "warning" : "",
-  });
-  html += kpiCardHtml({
-    tone: "purple", icon: ICON_BOLT,
-    label: "在岗虚拟员工",
-    value: agents.length || 5, suffix: "位",
-    foot: workingCount + " 位工作中 · " + blockedCount + " 位阻塞",
-    footTone: blockedCount > 0 ? "warning" : "success",
-  });
-  html += kpiCardHtml({
-    tone: "info", icon: ICON_PULSE,
-    label: "今日协作活动",
-    value: events.length,
-    foot: dryRunEvents + " 次干跑 · " + blockedEvents + " 次阻断",
-  });
-  html += kpiCardHtml({
-    tone: safetyOk ? "success" : "warning", icon: ICON_SHIELD,
-    label: "组织安全状态",
-    value: safetyOk ? "安全" : "需复核",
-    foot: "只读模式 · 写入需人工",
-    footTone: safetyOk ? "success" : "warning",
-  });
-
-  grid.innerHTML = html;
-}
-
-// ── Org Overview ──
-
-function statusClassFor(status) {
-  if (status === "工作中") return "agent-status-active";
-  if (status === "需要人工处理") return "agent-status-human";
-  if (status === "阻塞") return "agent-status-blocked";
-  return "agent-status-idle";
-}
-
-export function renderOrgOverview(data, eventsData) {
-  const el = document.getElementById("org-overview-container");
-  if (!el) return;
-  if (!data || !Array.isArray(data.agents)) {
-    el.innerHTML = errorHtml();
-    return;
-  }
-
-  const events = Array.isArray(eventsData) ? eventsData : [];
-  const countsByAgent = {};
-  const blockedByAgent = {};
-  for (let i = 0; i < events.length; i++) {
-    const name = events[i].agent_name;
-    if (!name) continue;
-    countsByAgent[name] = (countsByAgent[name] || 0) + 1;
-    if (events[i].execution_mode === "blocked") {
-      blockedByAgent[name] = (blockedByAgent[name] || 0) + 1;
-    }
-  }
-
-  let html = '<div class="org-overview-grid">';
-  html += '<div class="org-agents-grid">';
-  for (let j = 0; j < data.agents.length; j++) {
-    const a = data.agents[j];
-    const statusCls = "agent-status " + statusClassFor(a.status);
-    const role = AGENT_DESCRIPTIONS[a.agent_name] || (a.role_label || "");
-    const count = countsByAgent[a.agent_name] || 0;
-    const blocked = blockedByAgent[a.agent_name] || 0;
-
-    html += '<div class="agent-card">';
-    html += '<div class="agent-card-head">';
-    html += avatarHtml(a.agent_name);
-    html += '<div class="agent-card-meta-top">';
-    html += '<div class="agent-card-name">' + esc(a.agent_name) + '</div>';
-    html += '<div class="agent-card-role">' + esc(role) + '</div>';
-    html += '</div>';
-    html += '<span class="' + statusCls + '"><span class="agent-status-dot"></span>' +
-      esc(a.status) + '</span>';
-    html += '</div>';
-    html += '<div class="agent-card-summary">' + esc(a.last_event_summary || "暂无活动记录") + '</div>';
-    html += '<div class="agent-card-foot">';
-    html += '<span class="agent-card-foot-item">活动 <strong>' + count + '</strong> 次</span>';
-    html += '<span class="agent-card-foot-item">阻塞 <strong>' + blocked + '</strong></span>';
-    html += '<span class="agent-card-foot-item" style="margin-left:auto">' +
-      (a.duration_ms != null ? '上次耗时 <strong>' + a.duration_ms + ' ms</strong>' : '—') +
-      '</span>';
-    html += '</div>';
-    html += '</div>';
-  }
   html += '</div>';
-
-  if (data.safety) {
-    html += '<div class="org-safety">';
-    html += '<div class="org-safety-title">组织安全状态</div>';
-    html += '<div class="org-safety-sub">' + esc(buildSafetySubText(data)) + '</div>';
-    html += '<div class="safety-rows">';
-    html += safetyRow("只读模式", data.safety.read_only);
-    html += safetyRow("真实写入", data.safety.real_writes);
-    html += safetyRow("外部模型调用", data.safety.external_model_calls);
-    html += safetyRow("演示模式", data.safety.demo_mode);
-    html += '</div>';
-    html += '</div>';
-  }
-  html += '</div>';
-
-  el.innerHTML = html;
+  return html;
 }
-
-// ── Pipeline Funnel ──
 
 export function renderPipeline(data, orgData) {
-  const container = document.getElementById("pipeline-container");
+  var container = document.getElementById("pipeline-tabs");
   if (!container) return;
 
-  let finalIdx = STATE_FLOW.indexOf(data.finalStatus);
-  if (finalIdx === -1) finalIdx = STATE_FLOW.length - 1;
+  var fullOrder = PIPELINE_ROW1.concat(PIPELINE_ROW2);
+  var finalIdx = resolveFinalIdx(data);
+  var analyticsAvailable = hasAnalyticsData(orgData);
 
-  const stageCounts = (orgData && orgData.pipeline && Array.isArray(orgData.pipeline.stage_counts))
-    ? orgData.pipeline.stage_counts : [];
-  let total = 0;
-  for (let ci = 0; ci < stageCounts.length; ci++) {
-    total += Number(stageCounts[ci].count) || 0;
+  // Build stage counts from orgData
+  var stageCounts = {};
+  var pipeline = (orgData && orgData.pipeline) || {};
+  var sc = Array.isArray(pipeline.stage_counts) ? pipeline.stage_counts : [];
+  for (var si = 0; si < sc.length; si++) {
+    stageCounts[sc[si].label] = sc[si].count;
   }
 
-  let html = '<div class="flow-wrapper"><div class="flow-track">';
+  var html = '<div class="pipeline-grid">';
 
-  for (let i = 0; i < STATE_FLOW.length; i++) {
-    const reached = i <= finalIdx;
-    const current = i === finalIdx && data.completed;
-    const cls = "flow-stage" + (current ? " is-current" : reached ? " is-reached" : "");
-    const label = STATE_LABELS[STATE_FLOW[i]] || STATE_FLOW[i];
-    const count = stageCounts[i] ? (Number(stageCounts[i].count) || 0) : 0;
-    const pct = total > 0 ? Math.round((count / total) * 100) : 0;
-
-    html += '<div class="' + cls + '">';
-    html += '<div class="flow-stage-pill">' + esc(label) + '</div>';
-    html += '<div class="flow-stage-count">' + count + '</div>';
-    html += '<div class="flow-stage-bar"><div class="flow-stage-bar-fill" style="width:' + pct + '%"></div></div>';
-    html += '<div class="flow-stage-pct">占比 ' + pct + '%</div>';
-    html += '</div>';
-
-    if (i < STATE_FLOW.length - 1) {
-      html += '<div class="flow-arrow">›</div>';
-    }
+  // Row 1
+  html += '<div class="pipeline-row">';
+  for (var i = 0; i < PIPELINE_ROW1.length; i++) {
+    html += renderStageCard(PIPELINE_ROW1[i], i, data, finalIdx, analyticsAvailable);
   }
+  html += '</div>';
 
-  html += '</div></div>';
+  // Row 2
+  html += '<div class="pipeline-row">';
+  for (var j = 0; j < PIPELINE_ROW2.length; j++) {
+    html += renderStageCard(PIPELINE_ROW2[j], PIPELINE_ROW1.length + j, data, finalIdx, analyticsAvailable);
+  }
+  html += '</div>';
 
+  html += '</div>'; // pipeline-grid
+
+  // Meta footer
   html += '<div class="pipeline-meta">';
-  html += '<div class="meta-chip"><span class="meta-label">最终状态</span>' +
-    '<span class="meta-value ' + (data.completed ? 'is-success' : '') + '">' +
-    esc(STATE_LABELS[data.finalStatus] || data.finalStatus) + '</span></div>';
-  html += '<div class="meta-chip"><span class="meta-label">是否完成</span>' +
-    '<span class="meta-value ' + (data.completed ? 'is-success' : 'is-error') + '">' +
-    (data.completed ? '是' : '否') + '</span></div>';
-  html += '<div class="meta-chip"><span class="meta-label">命令总数</span>' +
-    '<span class="meta-value">' + data.commandCount + '</span></div>';
-  html += '<div class="meta-chip"><span class="meta-label">写入计划</span>' +
-    '<span class="meta-value">已生成 ' + data.commandCount + ' 条</span></div>';
+  html += '<div class="pipeline-meta-chip"><span class="pipeline-meta-label">完成</span><span class="pipeline-meta-value ' + (data.completed ? 'success' : 'error') + '">' + (data.completed ? '是' : '否') + '</span></div>';
+  html += '<div class="pipeline-meta-chip"><span class="pipeline-meta-label">最终状态</span><span class="pipeline-meta-value">' + esc(data.finalStatus || "—") + '</span></div>';
   if (data.failedAgent) {
-    html += '<div class="meta-chip"><span class="meta-label">失败 Agent</span>' +
-      '<span class="meta-value is-error">' + esc(data.failedAgent) + '</span></div>';
+    html += '<div class="pipeline-meta-chip"><span class="pipeline-meta-label">失败节点</span><span class="pipeline-meta-value error">' + esc(data.failedAgent) + '</span></div>';
+  }
+  html += '<div class="pipeline-meta-chip"><span class="pipeline-meta-label">写入计划</span><span class="pipeline-meta-value">' + (data.commandCount != null ? data.commandCount : "—") + ' 条</span></div>';
+  // Show stage_counts from org overview
+  for (var si2 = 0; si2 < sc.length; si2++) {
+    html += '<div class="pipeline-meta-chip"><span class="pipeline-meta-label">' + esc(sc[si2].label) + '</span><span class="pipeline-meta-value">' + sc[si2].count + '</span></div>';
   }
   html += '</div>';
 
   container.innerHTML = html;
+
+  // Click handler: open agent drawer
+  var agentEls = container.querySelectorAll(".pipeline-card-agent");
+  for (var a = 0; a < agentEls.length; a++) {
+    agentEls[a].addEventListener("click", function (ev) {
+      ev.stopPropagation();
+      var agentId = ev.currentTarget.getAttribute("data-agent-id");
+      if (window._hireloopOpenAgentDrawer) window._hireloopOpenAgentDrawer(agentId);
+    });
+  }
+
+  // Meta footer element (for backward compat)
+  var metaEl = document.getElementById("pipeline-meta-container");
+  if (metaEl) metaEl.innerHTML = "";
 }

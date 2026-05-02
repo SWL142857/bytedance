@@ -12,7 +12,7 @@ export interface HrCoordinatorInput {
   screeningRecommendation: "strong_match" | "review_needed" | "weak_match" | null;
   focusAreas: string[];
   riskChecks: string[];
-  fromStatus: "interview_kit_ready";
+  fromStatus: "interview_kit_ready" | "decision_pending";
 }
 
 const FAILED_OUTPUT: HrCoordinatorOutput = {
@@ -82,15 +82,17 @@ export async function runHrCoordinator(
 
   if (runStatus !== "failed") {
     try {
-      // Status transition is the last (and only business) write
-      commands.push(
-        updateCandidateStatus({
-          candidateRecordId: input.candidateRecordId,
-          fromStatus: input.fromStatus,
-          toStatus: "decision_pending",
-          actor: "agent",
-        }),
-      );
+      // Status transition — skip if already at target (Reviewer may have advanced us)
+      if (input.fromStatus !== "decision_pending") {
+        commands.push(
+          updateCandidateStatus({
+            candidateRecordId: input.candidateRecordId,
+            fromStatus: input.fromStatus,
+            toStatus: "decision_pending",
+            actor: "agent",
+          }),
+        );
+      }
     } catch (cmdErr) {
       return {
         commands: [appendAgentRun(buildAgentRun({

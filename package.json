@@ -13,6 +13,8 @@
     "base:seed:execute": "node --import tsx scripts/seed-base.ts --execute",
     "base:bootstrap:dry-run": "node --import tsx scripts/bootstrap-live-base.ts",
     "base:bootstrap:execute": "node --import tsx scripts/bootstrap-live-base.ts --execute",
+    "base:migrate-schema:dry-run": "node --import tsx scripts/migrate-base-schema.ts",
+    "base:migrate-schema:execute": "node --import tsx scripts/migrate-base-schema.ts --execute",
     "pipeline:demo": "node --import tsx scripts/demo-pipeline.ts",
     "pipeline:run": "node --import tsx scripts/run-agent-pipeline.ts",
     "report:demo": "node --import tsx scripts/demo-report.ts",
@@ -41,6 +43,7 @@
     "mvp:api-boundary-audit": "node --import tsx scripts/demo-api-boundary-release-audit.ts",
     "dataset:run": "node --import tsx scripts/run-live-agent-dataset.ts",
     "provider:dataset-verify": "node --import tsx scripts/run-provider-dataset-verify.ts",
+    "competition:rag:prepare": "node --import tsx scripts/prepare-competition-rag.ts",
     "ui:dev": "node --import tsx scripts/start-ui-server.ts",
     "scan:forbidden-traces": "node --import tsx scripts/run-forbidden-trace-scan.ts"
   },

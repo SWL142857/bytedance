@@ -31,11 +31,11 @@ describe("live MVP write runner script — dry-run", () => {
     assert.match(result.stdout, /Resolution source: sample/);
     assert.match(result.stdout, /Mode: DRY-RUN/);
     assert.match(result.stdout, /Executed: false/);
-    assert.match(result.stdout, /Results: 20/);
+    assert.match(result.stdout, /Results: 24/);
     assert.match(result.stdout, /planned: Upsert record into "Agent Runs"/);
     assert.match(result.stdout, /=== Execution Audit ===/);
     assert.match(result.stdout, /mode: dry_run/);
-    assert.match(result.stdout, /planned: 20/);
+    assert.match(result.stdout, /planned: 24/);
     assert.match(result.stdout, /recoveryNote: .*No writes were executed/);
     assert.ok(!result.stdout.includes("--json"));
     assert.ok(!result.stdout.includes("--base-token"));

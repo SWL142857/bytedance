@@ -50,15 +50,15 @@ export const TEXT_LABELS_DISPLAY = {
   "Test Suite": "测试套件",
   Tests: "测试",
   Build: "构建",
-  "Local MVP Demo": "本地 MVP 演示",
-  "Live Ready Demo": "在线就绪演示",
+  "Local MVP Demo": "本地运行快照",
+  "Live Ready Demo": "在线就绪预演",
   "Live Operator Runbook": "在线操作员手册",
   "Guarded Execute Block": "执行守卫阻断",
   "Forbidden Trace Scan": "禁用痕迹扫描",
   "API Boundary Audit": "API 边界审计",
-  "Deterministic Demo": "确定性演示",
+  "Deterministic Demo": "确定性安全预演",
   "Provider Smoke Guard": "供应商连通守卫",
-  "Provider Agent Demo Guard": "供应商 Agent 演示守卫",
+  "Provider Agent Demo Guard": "供应商 Agent 预览守卫",
   "Base Write Guard Independence": "Base 写入守卫独立",
   "Output Redaction": "输出脱敏",
   "Secret Scan": "密钥扫描",
@@ -87,16 +87,16 @@ export const TEXT_LABELS_DISPLAY = {
   "API boundary audit passed.": "API 边界审计通过。",
   "Deterministic MVP demo produces expected output.": "确定性 MVP 演示输出符合预期。",
   "Provider smoke runner is guarded (blocks without full env + confirm).": "供应商连通测试已受守卫保护，缺少完整环境或确认时会阻断。",
-  "Provider agent demo runner is guarded (blocks without --use-provider + execute + confirm).": "供应商 Agent 演示已受守卫保护，缺少供应商开关、执行标记或确认时会阻断。",
+  "Provider agent demo runner is guarded (blocks without --use-provider + execute + confirm).": "供应商 Agent 预览已受守卫保护，缺少供应商开关、执行标记或确认时会阻断。",
   "Base write guard is independent and not relaxed.": "Base 写入守卫保持独立，未被放松。",
-  "All demo outputs pass safety redaction checks.": "所有演示输出均通过安全脱敏检查。",
+  "All demo outputs pass safety redaction checks.": "所有预演输出均通过安全脱敏检查。",
   "No configured provider values found in tracked artifacts.": "未在受跟踪产物中发现已配置的供应商敏感值。",
   "Release gate report is consistent with API boundary audit.": "交付门禁报告与 API 边界审计一致。",
   "Agent output schemas are locked. No schema changes allowed without re-freeze.": "Agent 输出结构已锁定；未经重新冻结不得修改。",
   "Candidate status flow is locked. No state transitions can be added or modified.": "候选人状态流已锁定；不得新增或修改状态推进。",
   "Base write guards are locked. Guarded runner conditions cannot be relaxed.": "Base 写入守卫已锁定；不得放松守卫条件。",
   "Redaction policy is locked. No raw output leaking allowed.": "脱敏策略已锁定；不得泄露原始输出。",
-  "Deterministic demo not passing. Verify local demo before API integration.": "确定性演示尚未通过；接入 API 前需先验证本地演示。",
+  "Deterministic demo not passing. Verify local demo before API integration.": "确定性预演尚未通过；接入 API 前需先验证本地预演。",
   "Release gate not passing. Clear all release gate blocks first.": "交付门禁尚未通过；需先清除所有阻断项。",
   "LLM adapter boundary not defined. Define adapter interface before API integration.": "模型适配器边界尚未定义；接入 API 前需先定义适配接口。",
   "Config is complete for live execution.": "在线执行所需配置完整。",
@@ -107,7 +107,7 @@ export const TEXT_LABELS_DISPLAY = {
   "Provider adapter is not enabled.": "模型供应商适配器未启用。",
   'Provider "volcengine-ark" is disabled. No external model calls will be made.': "模型供应商 volcengine-ark 未启用，不会发起外部模型调用。",
   'Dry-run only. Provider "volcengine-ark" connectivity test is planned but not executed.': "仅干跑：模型供应商 volcengine-ark 连通测试已规划，但不会执行。",
-  'Dry-run only. Provider "volcengine-ark" agent demo is planned but not executed.': "仅干跑：模型供应商 volcengine-ark Agent 演示已规划，但不会执行。",
+  'Dry-run only. Provider "volcengine-ark" agent demo is planned but not executed.': "仅干跑：模型供应商 volcengine-ark Agent 预览已规划，但不会执行。",
   "Not ready. Fix: Resolution, Records, Write Plan, Write Commands. Then re-run readiness check.": "尚未就绪。请修复记录解析、记录、写入计划与写入命令后重新检查。",
   "Real writes require explicit human authorization via the guarded runner. On failure, review the execution audit, recovery plan, and verification report before deciding on targeted compensation or retry. Do NOT blindly re-run the full pipeline.": "真实写入必须通过受守卫保护的执行器，并取得明确人工授权。若执行失败，需先查看执行审计、恢复方案与验证报告，再决定定向补偿或重试；不得盲目重跑完整流水线。",
   "API boundary is audited. Default behavior: no external model calls, no real Base writes. Provider integration is guarded and opt-in only. Do not relax guards or bypass schema validation.": "API 边界已审计。默认行为为不调用外部模型、不执行真实 Base 写入；供应商接入受守卫保护且必须显式开启。不得放松守卫或绕过结构校验。",
@@ -121,7 +121,16 @@ export const TEXT_LABELS_DISPLAY = {
   "writing raw prompts, resumes, or credentials to output": "向输出写入原始提示词、简历或凭据",
   "bypassing schema validation": "绕过结构校验",
   "enabling external model calls by default": "默认启用外部模型调用",
-  sample: "演示样本",
+  sample: "预演样本",
+};
+
+export const UI_MESSAGES = {
+  SOURCE_FEISHU_LIVE: "来自飞书 Base 实时只读数据",
+  SOURCE_SNAPSHOT: "本地运行快照",
+  SOURCE_DETERMINISTIC: "确定性安全预演",
+  BOUNDARY_NO_AUTO_HIRE: "不自动录用/淘汰，不自动写飞书，真实写入必须人工确认。",
+  RAG_SAMPLE_NOTE: "Competition Graph RAG 能力样例（非主业务事实源）",
+  CARD_AUDIT_NOTE: "审计/状态卡，非执行入口",
 };
 
 export const EVENT_TYPE_LABELS = {
@@ -179,24 +188,30 @@ export const EVENT_VERB_BY_TYPE = {
 
 export const AVATAR_CLASS_BY_AGENT = {
   "HR 协调": "avatar-hr",
-  "简历解析": "avatar-resume",
-  "初筛评估": "avatar-screening",
+  "简历录入": "avatar-resume",
+  "信息抽取": "avatar-resume",
+  "图谱构建": "avatar-screening",
+  "图谱复核": "avatar-interview",
   "面试准备": "avatar-interview",
   "数据分析": "avatar-analytics",
 };
 
 export const AGENT_DESCRIPTIONS = {
   "HR 协调": "流程协调 · 任务分配 · 状态跟进",
-  "简历解析": "结构化简历事实抽取 · 不做评价",
-  "初筛评估": "基于 JD 的三档判断 · 含理由",
+  "简历录入": "简历原样打包 · 不做分析 · 确定性执行",
+  "信息抽取": "LLM 结构化抽取 · 技能 / 特征 / 画像 · 含置信度",
+  "图谱构建": "候选人相似边计算 · 图邻居链接 · 信号共享",
+  "图谱复核": "融合 6 种图谱信号 · 综合决策 · 可解释推荐",
   "面试准备": "生成面试题与评分表",
   "数据分析": "漏斗与阻塞点分析 · 周报",
 };
 
 export const AVATAR_INITIALS = {
   "HR 协调": "HR",
-  "简历解析": "简",
-  "初筛评估": "评",
+  "简历录入": "录",
+  "信息抽取": "抽",
+  "图谱构建": "图",
+  "图谱复核": "核",
   "面试准备": "面",
   "数据分析": "析",
 };
@@ -221,3 +236,134 @@ export const ICON_SHIELD = '<svg viewBox="0 0 24 24" fill="none" stroke="current
 export const ICON_PLAY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 4 20 12 6 20 6 4" fill="currentColor"/></svg>';
 export const ICON_CHECK_CIRCLE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg>';
 export const ICON_CHART = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><path d="M3 21h18"/><path d="M6 17V9"/><path d="M11 17V5"/><path d="M16 17v-7"/></svg>';
+export const ICON_SEARCH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>';
+export const ICON_ACTIVITY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>';
+export const ICON_CLOCK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
+export const ICON_DATABASE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>';
+
+// ── Pipeline Spine (8 stages, design contract) ──
+
+export const PIPELINE_STAGE_ORDER = [
+  "new",
+  "Intake",
+  "Extraction",
+  "Graph Builder",
+  "Interview Kit",
+  "Reviewer",
+  "HR Coordinator",
+  "decision_pending",
+  "Analytics",
+];
+
+// Two-row layout: 4 + 5. The final Analytics node is a post-decision
+// continuous-improvement employee, not an automatic hire/reject action.
+export const PIPELINE_ROW1 = ["new", "Intake", "Extraction", "Graph Builder"];
+export const PIPELINE_ROW2 = ["Interview Kit", "Reviewer", "HR Coordinator", "decision_pending", "Analytics"];
+
+// Old role names that must NOT appear in UI
+export const RETIRED_AGENT_NAMES = ["简历解析", "初筛评估", "resume_parser", "screening"];
+
+export const PIPELINE_STAGE_LABELS = {
+  "new": "来自飞书",
+  "Intake": "简历录入",
+  "Extraction": "信息抽取",
+  "Graph Builder": "图谱构建",
+  "Interview Kit": "面试准备",
+  "Reviewer": "图谱复核",
+  "HR Coordinator": "HR 协调",
+  "decision_pending": "待人工决策",
+  "Analytics": "数据分析",
+};
+
+export const PIPELINE_STAGE_DESCRIPTIONS = {
+  "new": "Feishu Base 实时只读候选人入口",
+  "Intake": "简历原样打包 · 确定性执行",
+  "Extraction": "LLM 结构化抽取 · 技能/经验/画像",
+  "Graph Builder": "Candidate similarity edges · graph neighbor linking",
+  "Interview Kit": "生成面试题与评分表",
+  "Reviewer": "融合图谱信号 · 可解释推荐",
+  "HR Coordinator": "流程协调 · 任务分配 · 状态跟进",
+  "decision_pending": "需人类操作员确认最终决策",
+  "Analytics": "漏斗统计 · 周报 · 阻塞点持续优化",
+};
+
+// ── 7 Agent Employees (static display metadata only) ──
+
+export const AGENT_NODES = [
+  {
+    id: "resume_intake",
+    name: "简历录入",
+    role: "简历原样打包 · 不做分析 · 确定性执行",
+    targetTable: "candidates",
+    mode: "确定性安全预演",
+    avatarInitial: "录",
+    colorVar: "--accent-purple",
+  },
+  {
+    id: "resume_extraction",
+    name: "信息抽取",
+    role: "LLM 结构化抽取 · 技能 / 特征 / 画像",
+    targetTable: "resume_facts",
+    mode: "本地运行快照",
+    avatarInitial: "抽",
+    colorVar: "--accent-purple",
+  },
+  {
+    id: "graph_builder",
+    name: "图谱构建",
+    role: "候选人相似边计算 · 图邻居链接 · 信号共享",
+    targetTable: "candidates",
+    mode: "本地运行快照",
+    avatarInitial: "图",
+    colorVar: "--accent-cyan",
+    isGraphRag: true,
+  },
+  {
+    id: "interview_kit",
+    name: "面试准备",
+    role: "生成面试问题、评分表、关注点",
+    targetTable: "interview_kits",
+    mode: "本地运行快照",
+    avatarInitial: "面",
+    colorVar: "--accent-orange",
+  },
+  {
+    id: "screening_reviewer",
+    name: "图谱复核",
+    role: "融合 6 种图谱信号 · 综合决策 · 可解释推荐",
+    targetTable: "evaluations",
+    mode: "本地运行快照",
+    avatarInitial: "核",
+    colorVar: "--accent-cyan",
+    isGraphRag: true,
+  },
+  {
+    id: "hr_coordinator",
+    name: "HR 协调",
+    role: "流程协调 · 任务分配 · 状态跟进",
+    targetTable: "work_events",
+    mode: "本地运行快照",
+    avatarInitial: "HR",
+    colorVar: "--accent-blue",
+  },
+  {
+    id: "analytics",
+    name: "数据分析",
+    role: "漏斗统计 · 周报 · 阻塞点分析",
+    targetTable: "reports",
+    mode: "本地运行快照",
+    avatarInitial: "析",
+    colorVar: "--accent-green",
+  },
+];
+
+// Map agent id → pipeline stage
+export const AGENT_TO_PIPELINE_STAGE = {
+  "resume_intake": "Intake",
+  "resume_extraction": "Extraction",
+  "graph_builder": "Graph Builder",
+  "interview_kit": "Interview Kit",
+  "screening_reviewer": "Reviewer",
+  "hr_coordinator": "HR Coordinator",
+  "analytics": "Analytics",
+};

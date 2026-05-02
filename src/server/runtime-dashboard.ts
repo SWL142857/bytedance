@@ -17,14 +17,22 @@ const PIPELINE_STAGES: Array<{ key: CandidateStatus; label: string }> = [
 
 const AGENT_LABELS = {
   hr_coordinator: "HR 协调",
-  resume_parser: "简历解析",
-  screening: "初筛评估",
+  resume_intake: "简历录入",
+  resume_extraction: "信息抽取",
+  graph_builder: "图谱构建",
+  screening_reviewer: "图谱复核",
   interview_kit: "面试准备",
   analytics: "数据分析",
+  resume_parser: "简历解析",
+  screening: "初筛评估",
 } as const;
 
 const AGENT_ROLES: Record<string, string> = {
   "HR 协调": "流程协调",
+  "简历录入": "原始简历入库",
+  "信息抽取": "结构化提取",
+  "图谱构建": "候选人相似关系",
+  "图谱复核": "图谱辅助评审",
   "简历解析": "信息提取",
   "初筛评估": "匹配评估",
   "面试准备": "面试材料",
@@ -33,10 +41,14 @@ const AGENT_ROLES: Record<string, string> = {
 
 const AGENT_TARGET_TABLES: Record<string, string | null> = {
   hr_coordinator: "candidates",
-  resume_parser: "resume_facts",
-  screening: "evaluations",
+  resume_intake: "candidates",
+  resume_extraction: "resume_facts",
+  graph_builder: "agent_runs",
+  screening_reviewer: "evaluations",
   interview_kit: "interview_kits",
   analytics: "reports",
+  resume_parser: "resume_facts",
+  screening: "evaluations",
 };
 
 export const DEFAULT_RUNTIME_SNAPSHOT_PATH = resolve(process.cwd(), "tmp", "latest-agent-runtime.json");
@@ -171,8 +183,10 @@ function buildOrgOverviewFromRuntime(
 
   const agents: OrgOverviewAgentView[] = [
     buildAgentOverview("HR 协调", latestByAgent.get("HR 协调") ?? null),
-    buildAgentOverview("简历解析", latestByAgent.get("简历解析") ?? null),
-    buildAgentOverview("初筛评估", latestByAgent.get("初筛评估") ?? null),
+    buildAgentOverview("简历录入", latestByAgent.get("简历录入") ?? null),
+    buildAgentOverview("信息抽取", latestByAgent.get("信息抽取") ?? latestByAgent.get("简历解析") ?? null),
+    buildAgentOverview("图谱构建", latestByAgent.get("图谱构建") ?? null),
+    buildAgentOverview("图谱复核", latestByAgent.get("图谱复核") ?? latestByAgent.get("初筛评估") ?? null),
     buildAgentOverview("面试准备", latestByAgent.get("面试准备") ?? null),
     buildAgentOverview("数据分析", latestByAgent.get("数据分析") ?? null),
   ];
@@ -294,6 +308,14 @@ function mapStatusLabel(status: string | null): string {
 
 function mapFailedAgent(agent: string | null): string {
   switch (agent) {
+    case "resume_intake":
+      return "简历录入";
+    case "resume_extraction":
+      return "信息抽取";
+    case "graph_builder":
+      return "图谱构建";
+    case "screening_reviewer":
+      return "图谱复核";
     case "resume_parser":
       return "简历解析";
     case "screening":

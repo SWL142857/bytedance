@@ -73,26 +73,38 @@ function extractJsonArg(command: { args: string[] }): Record<string, unknown> | 
   return JSON.parse(command.args[jsonIdx + 1]!) as Record<string, unknown>;
 }
 
-// ── Mock provider client (schema-valid 4-stage responses) ──
+// ── Mock provider client (schema-valid 5-stage responses for P3 pipeline) ──
 
 const SCHEMA_VALID_RESPONSES: Record<string, string> = {
-  resume_parser_v1: JSON.stringify({
-    facts: [
-      { factType: "work_experience", factText: "5 years as Product Manager at a technology company", sourceExcerpt: null, confidence: "high" },
-      { factType: "skill", factText: "SQL, Python basics, A/B testing", sourceExcerpt: null, confidence: "medium" },
-      { factType: "education", factText: "Bachelor's degree in Computer Science", sourceExcerpt: null, confidence: "high" },
+  extraction_v1: JSON.stringify({
+    skills: [
+      { name: "Product Management", canonicalName: "Product Management", confidence: 1.0, evidence: "5 years as PM" },
+      { name: "SQL", canonicalName: "SQL", confidence: 0.9, evidence: "SQL and data analysis" },
     ],
-    parseStatus: "success",
+    features: [
+      { featureType: "experience", featureName: "PM Tenure", canonicalName: "PM Tenure", featureValue: "5 years", confidence: 1.0, evidence: "5 years experience" },
+    ],
+    profile: {
+      yearsOfExperience: "5",
+      educationLevel: "Bachelor's",
+      industryBackground: "Technology",
+      leadershipLevel: "mid",
+      communicationLevel: "proficient",
+      systemDesignLevel: "proficient",
+      structuredSummary: "Candidate has 5 years PM experience in tech sector.",
+    },
   }),
-  screening_v1: JSON.stringify({
-    recommendation: "strong_match",
-    dimensionRatings: [
-      { dimension: "technical_depth", rating: "strong", reason: "Solid ML pipeline understanding", evidenceRefs: [] },
-      { dimension: "product_sense", rating: "strong", reason: "Clear feature prioritization", evidenceRefs: [] },
-      { dimension: "communication", rating: "medium", reason: "Good written specs", evidenceRefs: [] },
-    ],
-    fairnessFlags: [],
-    talentPoolSignal: null,
+  reviewer_v1: JSON.stringify({
+    decisionPred: "select",
+    confidence: 0.85,
+    reasonLabel: "Strong PM Fit",
+    reasonGroup: "skill_match",
+    reviewSummary: "Candidate demonstrates strong product management background with data analysis skills. Profile aligns well with role requirements.",
+  }),
+  graph_builder_v1: JSON.stringify({
+    shouldLink: true,
+    linkReason: "Candidates share product and data signals.",
+    sharedSignals: ["Product Management", "SQL"],
   }),
   interview_kit_v1: JSON.stringify({
     questions: [
@@ -428,7 +440,7 @@ describe("runLiveAgentDataset (injectable)", () => {
 
   // ═══ Provider pipeline with mock client ═══
 
-  it("completes full provider pipeline with mock client (4-stage schema-valid responses)", async () => {
+  it("completes full provider pipeline with mock client (5-stage schema-valid responses)", async () => {
     const { dir, path: snapPath } = tempSnapshotPath();
     try {
       const result = await runLiveAgentDataset({
