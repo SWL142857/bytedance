@@ -33,6 +33,7 @@ docs/*
 !docs/live-mvp-work-plan.md
 !docs/rag-contract.md
 !docs/design-system-tower.md
+!docs/website-usage.zh.md
 !docs/implementation/
 !docs/implementation/*.md
 !docs/prompts/
