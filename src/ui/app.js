@@ -45,16 +45,30 @@ window._hireloopReloadAfterRun = function () {
 
 function updateFeishuHeaderStatus(status) {
   var el = document.getElementById("header-feishu-status");
-  if (!el) return;
+  var openBtn = document.getElementById("header-open-feishu-btn");
   if (status && status.readEnabled && status.blockedReasons && status.blockedReasons.length === 0) {
-    el.className = "header-feishu-status online";
-    el.querySelector("span:last-child").textContent = "飞书已连接";
+    if (el) {
+      el.className = "header-feishu-status online";
+      el.querySelector("span:last-child").textContent = "飞书已连接";
+    }
   } else if (status && status.readiness === "partial") {
-    el.className = "header-feishu-status offline";
-    el.querySelector("span:last-child").textContent = "飞书部分配置";
+    if (el) {
+      el.className = "header-feishu-status offline";
+      el.querySelector("span:last-child").textContent = "飞书部分配置";
+    }
   } else {
-    el.className = "header-feishu-status offline";
-    el.querySelector("span:last-child").textContent = "飞书未连接";
+    if (el) {
+      el.className = "header-feishu-status offline";
+      el.querySelector("span:last-child").textContent = "飞书未连接";
+    }
+  }
+
+  if (openBtn) {
+    var canOpen = !!(status && status.feishuWebUrlAvailable);
+    openBtn.disabled = !canOpen;
+    openBtn.title = canOpen
+      ? "打开已配置的飞书 Base 页面"
+      : "未配置 FEISHU_BASE_WEB_URL / LARK_BASE_WEB_URL，暂不能从前端直达飞书页面";
   }
 }
 
@@ -89,6 +103,14 @@ function load() {
     .then(function (res) { return res.json(); })
     .then(updateFeishuHeaderStatus)
     .catch(function () {});
+
+  var headerFeishuBtn = document.getElementById("header-open-feishu-btn");
+  if (headerFeishuBtn) {
+    headerFeishuBtn.addEventListener("click", function () {
+      if (headerFeishuBtn.disabled) return;
+      window.open("/go/base", "_blank", "noopener");
+    });
+  }
 
   // Graph RAG overview (for header scale)
   fetch("/api/competition/overview")

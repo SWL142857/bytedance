@@ -14,6 +14,8 @@ Current canonical handoff: `docs/current-state.md`.
 | 不写 offer/rejected | `validateLiveCandidateWriteScope()` | Agent 和 RAG 输入都不能越权 |
 | 不泄露敏感输出 | server redaction + route tests | 新 route 也必须过 redaction |
 | 安全错误消息 | 中文固定文案，无 stack trace | 不能透传 err.message 到前端 |
+| 飞书网页跳转 | `/go/base` 和 `/go/:linkId` 只做安全导航 | 不能演变成写入或外链拼接入口 |
+| UI 写入暴露面 | 前端只允许 preview / plan / read-only state | 不能暴露 `/execute-writes`、`/execute-human-decision`、`/api/live/analytics/execute-report` |
 
 ## Request Guards
 
@@ -24,7 +26,7 @@ Current canonical handoff: `docs/current-state.md`.
 - `requireJsonContentType()` 精确解析 media type，只接受 `application/json`。
 - `parseJsonBody()` 限制 4KB，非法 JSON 或非对象 JSON 返回 400。
 
-当前 live POST route 都保持 loopback guard。Provider demo、execute-writes、human decision 和 analytics report 还要求 JSON content-type 和 body cap。
+当前 live POST route 都保持 loopback guard。Provider demo、execute-writes、human decision 和 analytics report 还要求 JSON content-type 和 body cap。`/go/*` 不是写入 route，但也必须保持服务端解析 opaque link ID 和已配置 URL，不能把真实 record ID 或 token 下发到前端。
 
 ## Provider Boundaries
 
@@ -72,6 +74,7 @@ Analytics report 是独立 guarded runner（Phase 7.8），只允许：
 - 不做任何 status transition
 - 双确认 + planNonce TOCTOU guard
 - 没有候选人数据时 `needs_review`，不写空报告
+- 即使未来补前端面板，也只能展示 plan/status，不应在浏览器端直接暴露 execute path 或确认短语
 
 ## Redaction Rules
 

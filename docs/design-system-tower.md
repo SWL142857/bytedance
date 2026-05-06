@@ -1,6 +1,6 @@
 # HireLoop 控制塔台设计系统
 
-> Historical visual exploration. Current frontend direction is `docs/superpowers/specs/2026-05-02-virtual-org-console-frontend-design.md`: full-canvas Virtual Org Console, real API data only, no fake cockpit logs. Use this file only as archived visual inspiration.
+> Historical visual exploration. Current frontend direction is the full-canvas Virtual Org Console described by `docs/current-state.md` and the public operator guide. Use this file only as archived visual inspiration.
 
 ## 设计方向
 

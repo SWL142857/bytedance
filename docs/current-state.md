@@ -1,6 +1,6 @@
 # HireLoop Current State
 
-Last updated: 2026-05-02.
+Last updated: 2026-05-06.
 
 This is the first file a new agent should read. It reconciles the older 5-agent MVP docs, the Competition Graph RAG work, and the current Virtual Org Console direction.
 
@@ -28,10 +28,9 @@ Frontend direction accepted on 2026-05-02:
 - Competition Graph RAG is visually prominent near Graph Builder and Reviewer, but remains decision support.
 - Audit timeline and status surfaces must use real APIs, not random logs or hardcoded success.
 
-Authoritative frontend spec:
+Public operator guide:
 
-- `docs/superpowers/specs/2026-05-02-virtual-org-console-frontend-design.md`
-- `docs/superpowers/plans/2026-05-02-virtual-org-console-claude-prompt.md`
+- `docs/website-usage.zh.md`
 
 ## Current Agent Organization
 
@@ -136,6 +135,16 @@ Real writes are guarded and opt-in:
 - Analytics report writes are a separate guarded runner.
 - UI must not add a direct execute button or prefill confirmation tokens.
 
+## Feishu Navigation Surface
+
+Safe browser navigation is separate from write APIs:
+
+- Header button `打开飞书 Base` opens `/go/base`.
+- Candidate detail button `打开飞书记录` opens `/go/:linkId`.
+- Availability comes from `/api/live/base-status` field `feishuWebUrlAvailable`.
+- `handleGo()` only returns a `302` to configured Feishu web URLs, or a safe JSON unavailable message.
+- Navigation routes never mutate Base state and must not become write entry points.
+
 ## Current Verification Commands
 
 Use these before handing work back:
@@ -157,6 +166,15 @@ pnpm exec tsx --test \
   tests/orchestrator/live-candidate-runner.test.ts
 ```
 
+Known local gap on 2026-05-06:
+
+- `pnpm typecheck` currently fails in `src/feishu/long-connection.ts` and related tests because `@larksuiteoapi/node-sdk` is missing from the workspace baseline.
+- Feishu safe-jump and UI boundary work was verified with:
+
+```bash
+node --import tsx --test tests/server/live-base.test.ts tests/server/server-routes.test.ts
+```
+
 ## Documentation Priority
 
 When docs conflict, trust them in this order:
@@ -164,10 +182,12 @@ When docs conflict, trust them in this order:
 1. `docs/current-state.md`
 2. `CLAUDE.md`
 3. `README.md`
-4. `docs/competition-integration-handoff.zh.md` / `docs/competition-integration-handoff.en.md`
+4. `docs/website-usage.zh.md`
 5. `docs/architecture.md`
-6. `docs/security-boundaries.md`
-7. `docs/rag-contract.md`
-8. Historical specs/plans under `docs/superpowers/`
+6. `docs/phase-status.md`
+7. `docs/operations-runbook.md`
+8. `docs/security-boundaries.md`
+9. `docs/competition-integration-handoff.zh.md` / `docs/competition-integration-handoff.en.md`
+10. `docs/rag-contract.md`
 
-Historical specs are useful for rationale but may describe superseded 5-agent or standalone Graph RAG decisions.
+Historical specs/prompts/plans are kept out of the public repo and should not be treated as authoritative project state.

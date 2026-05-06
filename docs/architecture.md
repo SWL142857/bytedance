@@ -57,7 +57,7 @@ src/
   llm/            deterministic client、provider adapter/client、provider smoke/demo
   orchestrator/   pipeline、状态机、live runner、release gate、安全审计
   runtime/        JSON/dataset/AgentInputBundle 装载、RAG dataset verification
-  server/         本地 UI service、request guards、redaction、live Base service、link registry
+  server/         本地 UI service、request guards、redaction、live Base service、link registry、安全 `/go/*` 导航
   ui/             静态 ES modules 前端
 tests/            逻辑测试和 route 测试
 ```
@@ -84,6 +84,15 @@ Live candidate 相关路径已经统一使用 `readLiveCandidateContext(linkId, 
 2. `executeLiveCandidateWrites()` 重新读取数据、重新跑 pipeline、复算 nonce，通过双确认后顺序执行写入。
 
 这条新 live candidate flow 目前只推进到 `decision_pending`，不做 `offer` / `rejected`。
+
+## Feishu Navigation Surface
+
+前端的飞书网页跳转与写入路径分离：
+
+- `/go/base`：跳到已配置的 Base 网页。
+- `/go/:linkId`：通过 `live-link-registry` 解析 `lnk_live_*`，再跳到对应表级网页。
+- 真实 Feishu 网页 URL 和 Base record ID 只保留在服务端，不直接下发给前端。
+- 这些路由只做导航，不触发任何 Base 写入。
 
 ## Graph RAG Enhancement Layer (P2, 2026-05-01)
 

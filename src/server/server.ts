@@ -1087,6 +1087,21 @@ function handleGo(req: http.IncomingMessage, res: http.ServerResponse): void {
   const url = new URL(req.url ?? "/", `http://localhost:${PORT}`);
   const linkId = decodeURIComponent(url.pathname.slice(4));
 
+  if (linkId === "base") {
+    const baseUrl = resolveLiveFeishuUrl("base");
+    if (baseUrl) {
+      res.writeHead(302, { Location: baseUrl });
+      res.end();
+      return;
+    }
+    jsonResponse(res, {
+      mode: "live",
+      available: false,
+      message: "飞书 Base 页面 URL 未配置，请设置 FEISHU_BASE_WEB_URL 或 LARK_BASE_WEB_URL。",
+    });
+    return;
+  }
+
   // Demo links — same behavior as before
   if (/^lnk_demo_\d{3}$/.test(linkId)) {
     jsonResponse(res, {

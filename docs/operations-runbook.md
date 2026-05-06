@@ -10,6 +10,15 @@ pnpm test
 pnpm mvp:demo
 ```
 
+已知本地基线（2026-05-06）：
+
+- `pnpm typecheck` 当前会因缺少 `@larksuiteoapi/node-sdk` 在 long-connection 路径失败。
+- 飞书跳转和 UI 收口相关变更请至少跑：
+
+```bash
+node --import tsx --test tests/server/live-base.test.ts tests/server/server-routes.test.ts
+```
+
 `pnpm mvp:demo` 当前会输出：
 
 - Stage 1：Candidate Pipeline 到 `decision_pending`
@@ -107,6 +116,22 @@ curl "http://localhost:3000/api/live/records?table=jobs"
 ```
 
 安全投影不返回 `rec_` record ID、`resume_text` 原文、token、payload、stdout/stderr。
+
+## Safe Feishu Web Navigation
+
+顶部 `打开飞书 Base` 和候选人详情 `打开飞书记录` 都走本地后端安全导航：
+
+```bash
+curl -sS http://localhost:3000/api/live/base-status
+curl -sS -D - -o /dev/null http://localhost:3000/go/base
+```
+
+说明：
+
+- `/api/live/base-status` 返回 `feishuWebUrlAvailable=true` 时，顶部按钮才会启用。
+- `/go/base` 返回 `302` 到已配置的 Base 网页 URL。
+- `/go/:linkId` 返回 `302` 到对应表级网页 URL；前端不会拿到真实 record ID。
+- 如果网页 URL 未配置，`/go/*` 返回安全 JSON unavailable message，而不是猜测外链。
 
 ## Live Candidate Dry-Run
 
@@ -306,6 +331,7 @@ POST /api/live/analytics/execute-report
 - 不写 Candidates，也不做任何状态转换。
 - 响应不包含 record ID、resume、payload、stdout/stderr、prompt 或 provider secret。
 - 缺少 `HIRELOOP_ALLOW_LARK_WRITE=1` 时阻断执行。
+- 当前 UI 不暴露 execute-report 按钮；如需真实执行，仍应通过后端 API 双确认完成。
 
 ## Recommended Demo Order
 

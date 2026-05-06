@@ -14,6 +14,7 @@ export interface LiveBaseStatus {
   larkEnvComplete: boolean;
   readEnabled: boolean;
   writeDisabled: boolean;
+  feishuWebUrlAvailable: boolean;
   blockedReasons: string[];
   readiness: "ready" | "partial" | "blocked";
   configuredCount: number;
@@ -104,6 +105,8 @@ export function getLiveBaseStatus(deps?: LiveBaseDeps): LiveBaseStatus {
     larkAppSecret: Boolean(config.larkAppSecret),
     baseAppToken: Boolean(config.baseAppToken),
   };
+  const feishuWebUrlAvailable = hasSafeWebUrl(config.feishuBaseWebUrl)
+    || Object.values(config.feishuTableWebUrls ?? {}).some(hasSafeWebUrl);
   const requiredValues = Object.values(checks);
   const configuredCount = requiredValues.filter(Boolean).length;
   const readiness = blockedReasons.length === 0
@@ -117,12 +120,23 @@ export function getLiveBaseStatus(deps?: LiveBaseDeps): LiveBaseStatus {
     larkEnvComplete: !!(config.larkAppId && config.larkAppSecret && config.baseAppToken),
     readEnabled: config.allowLarkRead,
     writeDisabled: !config.allowLarkWrite,
+    feishuWebUrlAvailable,
     blockedReasons,
     readiness,
     configuredCount,
     requiredCount: requiredValues.length,
     checks,
   };
+}
+
+function hasSafeWebUrl(rawUrl: string | null | undefined): boolean {
+  if (!rawUrl) return false;
+  try {
+    const url = new URL(rawUrl);
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
+  }
 }
 
 function isLarkCliAvailable(): boolean {

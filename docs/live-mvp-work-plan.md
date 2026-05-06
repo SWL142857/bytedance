@@ -15,7 +15,7 @@ Current canonical handoff: `docs/current-state.md`.
 
 ## Current Gap Assessment
 
-截至 2026-05-02，本地/demo 版已跑通；真实飞书端到端 API 闭环和 13 步 runbook 已补齐。当前主缺口是真实飞书 smoke、provider preview 稳定性、已存在 Base 的 schema migration，以及 Virtual Org Console 前端落地。
+截至 2026-05-06，本地/demo 版已跑通；真实飞书端到端 API 闭环和 13 步 runbook 已补齐。Virtual Org Console 主界面、白底 PNG 品牌素材和飞书安全跳转已经落地。当前主缺口是真实飞书 smoke、provider preview 稳定性、已存在 Base 的 schema migration，以及只读型 Analytics 状态面板（如继续做，也必须保持 execute 边界留在后端）。
 
 | 步骤 | 当前状态 | 还差什么 |
 |------|----------|----------|

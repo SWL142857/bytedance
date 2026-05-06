@@ -18,7 +18,7 @@ Current canonical handoff: `docs/current-state.md`.
 | Phase 6.1a | 完成 | 本地真实 agent 输入驱动 + runtime snapshot |
 | Phase 6.4 | 完成 | Live dataset agent runner，支持 JSON array / JSONL 输入 |
 | Phase 6.6 | 完成 | forbidden trace scanner 接入 release gate、API boundary audit 和 server report |
-| Phase 6.7 | 完成 | 飞书实时只读 + 安全跳转 |
+| Phase 6.7 | 完成 | 飞书实时只读 + 安全跳转（`/go/base` / `/go/:linkId`） |
 | Phase 6.8 | 完成 | 前端候选人 detail 可运行 deterministic Agent 预演 |
 | P1 Competition Shell Refactor | 已完成，P2 方向纠正 | Graph RAG 曾被做成独立驾驶舱；P2 纠正方向为 A 为主 B 为辅，Graph RAG 溶解进 Pipeline 的 Graph Builder/Reviewer/Decision 环节 |
 | P2 Product Realignment | 完成 | Feishu Live Pipeline 恢复为主产品；Graph RAG 作为 pipeline 增强层嵌入；P1 独立 UI 方向纠正 |
@@ -45,6 +45,7 @@ Current canonical handoff: `docs/current-state.md`.
 - `pnpm ui:dev`：启动本地 UI，显示 demo/runtime snapshot/live records。
 - `GET /api/live/base-status`：检查飞书只读连接状态。
 - `GET /api/live/records?table=candidates|jobs`：返回飞书安全列表，不暴露 record ID 和简历原文。
+- `GET /go/base` / `GET /go/:linkId`：安全导航到已配置的飞书网页，不暴露真实 record ID 或外链拼接逻辑。
 - `POST /api/live/candidates/:linkId/run-dry-run`：对真实候选人跑 deterministic dry-run，不写 Base。
 - `POST /api/live/candidates/:linkId/run-provider-agent-demo`：confirm 后对真实候选人跑完整 P3 provider preview pipeline，不写 Base。
 - `POST /api/live/candidates/:linkId/generate-write-plan`：只读生成写回计划摘要。
@@ -61,6 +62,7 @@ Current canonical handoff: `docs/current-state.md`.
 |----|------|
 | Competition GNN/query-aware subgraph | 等队友把 GNN prediction / query-aware subgraph 输出整理为 handoff 文档约定字段 |
 | Write-back UI execute button | UI 写入需要单独安全交互设计；当前只展示 write plan summary |
+| Analytics execute UI | 可以补计划/状态面板，但当前不应把 `/api/live/analytics/execute-report`、确认短语或自动写入动作暴露到前端 |
 
 ## Next Focus
 
@@ -70,5 +72,6 @@ Current canonical handoff: `docs/current-state.md`.
 2. 继续提升 provider preview 的真实运行稳定性，失败也必须安全审计呈现。
 3. 真实飞书 smoke：在真实 Base 上跑一遍完整流程验证。
 4. Feishu Base schema migration：为已 bootstrap 的 Base 补齐新增 select options。
+5. 如果继续做 Analytics 前端，只做只读计划和状态可视化，保持双确认写回边界在后端。
 
 详细任务见 [Live MVP Work Plan](live-mvp-work-plan.md)。

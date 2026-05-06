@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>HireLoop · 飞书招聘虚拟组织控制台</title>
-  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/favicon.png?v=20260506b" type="image/png">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -29,7 +29,9 @@
   <header>
     <div class="header-inner header-panel">
       <div class="brand">
-        <div class="brand-mark" aria-hidden="true">职</div>
+        <div class="brand-mark">
+          <img src="/assets/hireloop-mark.png?v=20260506b" alt="HireLoop logo">
+        </div>
         <div class="brand-text">
           <span class="brand-text-zh">HireLoop Virtual Org Console</span>
           <!-- test assertion anchor -->
@@ -43,6 +45,7 @@
         </span>
         <span id="graph-rag-scale" class="mode-pill graph-rag-scale-pill" style="display:none;"></span>
         <span class="mode-pill">飞书只读 / 写回需人工</span>
+        <button type="button" class="console-header-btn feishu-jump-btn" id="header-open-feishu-btn" disabled>打开飞书 Base</button>
         <button type="button" class="console-header-btn" id="console-open-btn">安全审计</button>
         <span class="header-time" id="header-time">—</span>
       </div>
@@ -160,7 +163,7 @@
             <textarea id="reviewer-ad-hoc-resume" class="deferred-textarea" placeholder="Resume / 简历正文" required></textarea>
             <button type="submit" class="detail-action-btn detail-action-btn-warn">新建简历并开始复核</button>
           </form>
-          <div id="reviewer-history-note" class="section-source-hint">Reviewer RAG 将基于 competition 图谱快照和 LLM 进行判断。</div>
+          <div id="reviewer-history-note" class="section-source-hint">Reviewer RAG 基于 competition 图谱快照和 LLM 进行判断；该复核报告只读展示，不写入飞书。</div>
         </div>
         <div class="reviewer-result-panel" id="reviewer-result-panel">
           <div class="graph-canvas-empty">输入候选人 ID 或带入当前候选人后开始复核</div>
@@ -259,13 +262,15 @@
         <span class="footer-pill">Graph RAG 技术验证</span>
         <span class="footer-pill pill-info">严格隔离与脱敏</span>
       </div>
-      <div class="footer-meta" id="footer-meta">职链 HireLoop 控制台 · 不暴露 Raw JSON 与敏感路径</div>
+      <div class="footer-meta" id="footer-meta">HireLoop 控制台 · 不暴露 Raw JSON 与敏感路径</div>
     </div>
   </footer>
 
   <!-- Intro overlay -->
   <div id="intro-overlay" class="intro-overlay">
-    <div class="intro-mark">职</div>
+    <div class="intro-mark">
+      <img src="/assets/hireloop-mark.png?v=20260506b" alt="" aria-hidden="true">
+    </div>
     <div class="intro-text">HireLoop Virtual Org Console 正在就绪</div>
     <div class="intro-bar"><div class="intro-bar-fill"></div></div>
   </div>

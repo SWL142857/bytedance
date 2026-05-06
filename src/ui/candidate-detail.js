@@ -39,10 +39,16 @@ function renderProfileZone(container) {
   const recommendation = c.screening_recommendation || "—";
   const jobDisplay = c.job_display || "—";
   const resumeLabel = c.resume_available ? "有简历" : "无简历";
+  const openAction = _currentLinkId
+    ? '<button type="button" class="detail-action-btn detail-open-feishu-btn" id="detail-open-feishu-btn">打开飞书记录</button>'
+    : "";
 
   container.innerHTML =
     '<div class="detail-zone profile-zone">' +
+    '<div class="detail-zone-header-row">' +
     '<div class="detail-zone-title">候选人信息（飞书安全摘要）</div>' +
+    openAction +
+    '</div>' +
     '<div class="detail-profile-grid">' +
     '<div class="detail-profile-field"><span class="detail-field-label">姓名</span><span class="detail-field-value">' + esc(c.display_name || "—") + '</span></div>' +
     '<div class="detail-profile-field"><span class="detail-field-label">状态</span><span class="detail-field-value">' + badgeHtml(status) + '</span></div>' +
@@ -51,6 +57,13 @@ function renderProfileZone(container) {
     '<div class="detail-profile-field"><span class="detail-field-label">简历</span><span class="detail-field-value">' + esc(resumeLabel) + '</span></div>' +
     '</div>' +
     '</div>';
+
+  const openBtn = container.querySelector("#detail-open-feishu-btn");
+  if (openBtn) {
+    openBtn.addEventListener("click", function () {
+      window._hireloopOpenFeishu(_currentLinkId);
+    });
+  }
 }
 
 function renderDryRunZone(container) {
@@ -96,7 +109,7 @@ function renderWritePlanZone(container) {
   container.innerHTML =
     '<div class="detail-zone writeplan-zone">' +
     '<div class="detail-zone-title">写回计划摘要（只读）</div>' +
-    '<div class="detail-zone-desc">生成确定性 pipeline 的写入计划，不执行真实写入。仅展示审阅信息。<br><span style="color:var(--accent-orange)">' + UI_MESSAGES.BOUNDARY_NO_AUTO_HIRE + '</span></div>' +
+    '<div class="detail-zone-desc">生成确定性 pipeline 的写入计划，不执行真实写入；需要后端双确认接口才会真正写回到飞书 Candidates / Evaluations / Interview Kits / Agent Runs。<br><span style="color:var(--accent-orange)">' + UI_MESSAGES.BOUNDARY_NO_AUTO_HIRE + '</span></div>' +
     '<div class="detail-zone-result" id="detail-writeplan-result"></div>' +
     '<button type="button" class="detail-action-btn" id="detail-writeplan-btn">生成写回计划摘要</button>' +
     '</div>';

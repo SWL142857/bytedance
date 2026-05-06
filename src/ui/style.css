@@ -167,12 +167,14 @@ header {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--text-primary);
-  color: #fff;
-  font-size: 18px;
-  font-weight: 700;
-  border-radius: var(--radius-sm);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  flex-shrink: 0;
+}
+.brand-mark img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 8px rgba(0,0,0,0.12));
 }
 .brand-text {
   display: flex;
@@ -216,6 +218,19 @@ header {
 .console-header-btn:hover {
   border-color: var(--text-primary);
   transform: translateY(-1px);
+}
+.console-header-btn:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  transform: none;
+}
+.console-header-btn:disabled:hover {
+  border-color: var(--border-medium);
+}
+.feishu-jump-btn:not(:disabled) {
+  border-color: rgba(0, 113, 227, 0.28);
+  background: var(--accent-blue-light);
+  color: var(--accent-blue);
 }
 .header-feishu-status {
   display: inline-flex;
@@ -3102,15 +3117,16 @@ body[data-graph-scene="reviewer"] #graph-scene-reviewer {
 .intro-mark {
   width: 48px;
   height: 48px;
-  border-radius: var(--radius-md);
-  background: var(--text-primary);
-  color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 22px;
-  font-weight: 700;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+}
+.intro-mark img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 16px rgba(0,0,0,0.12));
 }
 .intro-text {
   font-size: 13px;
@@ -3328,6 +3344,17 @@ footer {
 .detail-zone-loading { font-size: 12.5px; color: var(--text-tertiary); padding: 8px 0; }
 .detail-zone-result { margin-bottom: 12px; }
 
+.detail-zone-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.detail-zone-header-row .detail-zone-title {
+  margin-bottom: 0;
+}
+
 .detail-result-ok     { font-size: 12.5px; color: var(--accent-green); padding: 8px 0; }
 .detail-result-blocked{ font-size: 12.5px; color: var(--accent-orange); padding: 8px 0; }
 .detail-result-error  { font-size: 12.5px; color: var(--accent-red); padding: 8px 0; }
@@ -3363,6 +3390,14 @@ footer {
 .detail-action-btn-warn {
   border-color: rgba(255,149,0,0.3);
   color: var(--accent-orange);
+}
+.detail-open-feishu-btn {
+  min-height: 34px;
+  padding: 7px 12px;
+  border-color: rgba(0, 113, 227, 0.28);
+  color: var(--accent-blue);
+  background: var(--accent-blue-light);
+  white-space: nowrap;
 }
 
 .detail-confirm-row { display: flex; gap: 8px; align-items: center; }
@@ -3688,7 +3723,7 @@ footer {
 
 @media (max-width: 400px) {
   :root { --gutter: 16px; }
-  .brand-mark { width: 32px; height: 32px; font-size: 15px; }
+  .brand-mark { width: 32px; height: 32px; }
   .pipeline-tab { min-width: 140px; }
   .graph-node-center { max-width: 280px; }
 }
