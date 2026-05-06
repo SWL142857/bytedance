@@ -15,6 +15,16 @@ export interface LiveBaseStatus {
   readEnabled: boolean;
   writeDisabled: boolean;
   blockedReasons: string[];
+  readiness: "ready" | "partial" | "blocked";
+  configuredCount: number;
+  requiredCount: number;
+  checks: {
+    cliAvailable: boolean;
+    allowLarkRead: boolean;
+    larkAppId: boolean;
+    larkAppSecret: boolean;
+    baseAppToken: boolean;
+  };
 }
 
 export interface SafeLiveCandidate {
@@ -87,12 +97,31 @@ export function getLiveBaseStatus(deps?: LiveBaseDeps): LiveBaseStatus {
     blockedReasons.push("Base 应用凭证未配置");
   }
 
+  const checks = {
+    cliAvailable,
+    allowLarkRead: config.allowLarkRead,
+    larkAppId: Boolean(config.larkAppId),
+    larkAppSecret: Boolean(config.larkAppSecret),
+    baseAppToken: Boolean(config.baseAppToken),
+  };
+  const requiredValues = Object.values(checks);
+  const configuredCount = requiredValues.filter(Boolean).length;
+  const readiness = blockedReasons.length === 0
+    ? "ready"
+    : configuredCount > 0
+      ? "partial"
+      : "blocked";
+
   return {
     cliAvailable,
     larkEnvComplete: !!(config.larkAppId && config.larkAppSecret && config.baseAppToken),
     readEnabled: config.allowLarkRead,
     writeDisabled: !config.allowLarkWrite,
     blockedReasons,
+    readiness,
+    configuredCount,
+    requiredCount: requiredValues.length,
+    checks,
   };
 }
 

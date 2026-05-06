@@ -107,6 +107,21 @@ function renderWritePlanZone(container) {
   });
 }
 
+function renderDeferredQueueZone(container) {
+  container.innerHTML =
+    '<div class="detail-zone writeplan-zone">' +
+    '<div class="detail-zone-title">异步图更新</div>' +
+    '<div class="detail-zone-desc">先保存，不立即更新图。该候选人会加入异步队列，后续再按时间窗口集中处理。</div>' +
+    '<div class="detail-zone-result" id="detail-deferred-result"></div>' +
+    '<button type="button" class="detail-action-btn" id="detail-deferred-btn">加入异步图更新队列</button>' +
+    '</div>';
+
+  const btn = container.querySelector("#detail-deferred-btn");
+  btn.addEventListener("click", function () {
+    enqueueDeferredGraphRefresh(btn);
+  });
+}
+
 function renderWritePlanResult(data) {
   if (!data) return errorHtml();
 
@@ -253,6 +268,41 @@ function generateWritePlanFromDetail(btnEl) {
     });
 }
 
+function enqueueDeferredGraphRefresh(btnEl) {
+  if (!_currentLinkId) return;
+  btnEl.disabled = true;
+  btnEl.textContent = "暂存中...";
+  const resultEl = document.getElementById("detail-deferred-result");
+  if (resultEl) resultEl.innerHTML = '<div class="detail-zone-loading">正在加入异步队列...</div>';
+
+  fetch("/api/deferred-queue/candidates/" + encodeURIComponent(_currentLinkId) + "/enqueue-graph-refresh", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      displayName: _currentCandidate && _currentCandidate.display_name ? _currentCandidate.display_name : "",
+    }),
+  })
+    .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+    .then(function (result) {
+      if (!result.ok) {
+        throw new Error((result.data && result.data.error) || SAFE_ERROR_MSG);
+      }
+      if (resultEl) {
+        resultEl.innerHTML = '<div class="detail-result-ok">' + esc(result.data.safeSummary || "已加入异步队列。") + "</div>";
+      }
+      if (window._hireloopReloadDeferredQueue) {
+        window._hireloopReloadDeferredQueue();
+      }
+    })
+    .catch(function (err) {
+      if (resultEl) resultEl.innerHTML = '<div class="detail-result-error">' + esc(err.message || SAFE_ERROR_MSG) + "</div>";
+    })
+    .finally(function () {
+      btnEl.disabled = false;
+      btnEl.textContent = "加入异步图更新队列";
+    });
+}
+
 // ── Panel lifecycle ──
 
 export function initCandidateDetail() {
@@ -276,6 +326,7 @@ export function openCandidateDetail(linkId, candidateData) {
     '<div id="detail-zone-dryrun"></div>' +
     '<div id="detail-zone-provider"></div>' +
     '<div id="detail-zone-writeplan"></div>' +
+    '<div id="detail-zone-deferred"></div>' +
     '</div>';
 
   _panelEl.innerHTML = html;
@@ -292,6 +343,7 @@ export function openCandidateDetail(linkId, candidateData) {
   renderDryRunZone(document.getElementById("detail-zone-dryrun"));
   renderProviderPreviewZone(document.getElementById("detail-zone-provider"));
   renderWritePlanZone(document.getElementById("detail-zone-writeplan"));
+  renderDeferredQueueZone(document.getElementById("detail-zone-deferred"));
 
   // Close button
   const closeBtn = document.getElementById("cand-detail-close");

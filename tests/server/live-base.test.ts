@@ -48,6 +48,7 @@ describe("live-base — getLiveBaseStatus", () => {
     assert.equal(status.readEnabled, false);
     assert.ok(status.blockedReasons.length > 0);
     assert.ok(status.blockedReasons.some((r) => r.includes("HIRELOOP_ALLOW_LARK_READ")));
+    assert.equal(status.readiness, "partial");
   });
 
   it("blocked when Lark env incomplete", () => {
@@ -58,6 +59,8 @@ describe("live-base — getLiveBaseStatus", () => {
     assert.equal(status.readEnabled, true);
     assert.equal(status.larkEnvComplete, false);
     assert.ok(status.blockedReasons.some((r) => r.includes("飞书应用 ID")));
+    assert.equal(status.readiness, "partial");
+    assert.ok(status.configuredCount > 0);
   });
 
   it("ready when all env set and read enabled", () => {
@@ -67,6 +70,8 @@ describe("live-base — getLiveBaseStatus", () => {
     assert.equal(status.larkEnvComplete, true);
     assert.equal(status.blockedReasons.length, 0);
     assert.equal(status.writeDisabled, true);
+    assert.equal(status.readiness, "ready");
+    assert.equal(status.requiredCount, 5);
   });
 
   it("blocked when lark-cli is unavailable", () => {

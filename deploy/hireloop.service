@@ -1,0 +1,34 @@
+# HireLoop UI — install for systemd (Ubuntu / Debian)
+#
+# 1) Stop any manual: pkill -f start-ui-server.ts  (only if you were testing on :3000)
+# 2) chmod +x /data/bytedance/deploy/run-hireloop-ui.sh
+# 3) Optional env overrides:
+#    sudo tee /etc/default/hireloop <<'EOF'
+#    HIRELOOP_COMPETITION_ROOT=/data/competition
+#    PORT=3000
+#    # HIRELOOP_NODE_BIN=/root/miniconda3/envs/hireloop/bin/node
+#    # HIRELOOP_CONDA_ENV=hireloop
+#    EOF
+# 4) sudo cp /data/bytedance/deploy/hireloop.service /etc/systemd/system/hireloop.service
+# 5) sudo systemctl daemon-reload
+#    sudo systemctl enable --now hireloop
+# 6) curl -sI http://127.0.0.1:3000/ | head -3
+#    curl -sI http://127.0.0.1/ | head -3
+
+[Unit]
+Description=HireLoop UI (Node, port 3000; use nginx reverse proxy)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/data/bytedance
+EnvironmentFile=-/etc/default/hireloop
+Environment=HIRELOOP_COMPETITION_ROOT=/data/competition
+Environment=PORT=3000
+ExecStart=/data/bytedance/deploy/run-hireloop-ui.sh
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

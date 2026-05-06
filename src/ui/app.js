@@ -20,6 +20,7 @@ import {
 } from "./reports.js";
 import { loadLiveData } from "./live-records.js";
 import { initCandidateDetail } from "./candidate-detail.js";
+import { initDeferredQueueUi } from "./async-queue.js";
 
 // Expose for test backward compat + runtime snapshot refresh
 window._hireloopReloadAfterRun = function () {
@@ -48,6 +49,9 @@ function updateFeishuHeaderStatus(status) {
   if (status && status.readEnabled && status.blockedReasons && status.blockedReasons.length === 0) {
     el.className = "header-feishu-status online";
     el.querySelector("span:last-child").textContent = "飞书已连接";
+  } else if (status && status.readiness === "partial") {
+    el.className = "header-feishu-status offline";
+    el.querySelector("span:last-child").textContent = "飞书部分配置";
   } else {
     el.className = "header-feishu-status offline";
     el.querySelector("span:last-child").textContent = "飞书未连接";
@@ -78,6 +82,7 @@ function load() {
   // Fire-and-forget
   loadLiveData();
   initCandidateDetail();
+  initDeferredQueueUi();
 
   // Feishu header status
   fetch("/api/live/base-status")

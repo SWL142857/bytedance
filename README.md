@@ -64,6 +64,12 @@ pnpm base:bootstrap:execute
 # 启动本地 UI 服务
 pnpm ui:dev
 
+# 使用飞书长连接在本机接收事件
+pnpm feishu:events:long
+
+# 使用飞书长连接接收消息并自动回复
+pnpm feishu:events:long -- --reply
+
 # 用真实本地输入运行当前 pipeline，并生成 UI 可读 runtime snapshot
 pnpm pipeline:run --input-file=./path/to/candidate-pipeline.json
 
@@ -92,12 +98,64 @@ pnpm mvp:live-e2e-runbook --sample-complete
 - [Current State](docs/current-state.md)：后续 Agent 接手时优先阅读；统一 7-Agent、Graph RAG、前端方向和安全边界。
 - [Competition Handoff 中文版](docs/competition-integration-handoff.zh.md)：Graph RAG 接口、数据目录、API、队友下一步接入说明。
 - [Competition Handoff English](docs/competition-integration-handoff.en.md)：English handoff for Graph RAG integration.
+- [Website Usage 中文说明](docs/website-usage.zh.md)：网站实际使用方式、两大场景、图谱阅读方法和常见问题。
 - [Architecture](docs/architecture.md)：Agent、Base 表、状态机、项目结构。
 - [Phase Status](docs/phase-status.md)：已完成阶段、当前能力和暂缓项。
 - [Operations Runbook](docs/operations-runbook.md)：本地 demo、飞书只读、写回、provider 与 dataset 命令。
 - [Security Boundaries](docs/security-boundaries.md)：loopback、确认短语、redaction、写入白名单、错误输出边界。
 - [Live MVP Work Plan](docs/live-mvp-work-plan.md)：距离预期流程的差距、下一阶段任务和验收标准。
 - [RAG Contract](docs/rag-contract.md)：`AgentInputBundle`、`RetrievedEvidence[]`、验证报告与后续接入边界。
+
+## 飞书长连接接收事件
+
+如果你的飞书应用还没走完公网域名审核，可以先改用长连接模式，不需要公网 IP、域名或内网穿透。
+
+1. 在开发者后台把事件订阅方式切成“使用长连接接收事件”。
+2. 在本项目根目录创建 `.env.local`，至少配置：
+   `LARK_APP_ID=...`
+   `LARK_APP_SECRET=...`
+3. 启动长连接：
+
+```bash
+pnpm feishu:events:long
+```
+
+默认监听 `im.message.receive_v1`。如果你要同时接消息和新版卡片回调，可以把事件键配置成：
+
+`FEISHU_EVENT_KEYS=im.message.receive_v1,card.action.trigger`
+
+如果要立即验证收发链路，可以启用自动回复：
+
+```bash
+pnpm feishu:events:long -- --reply
+```
+
+可选环境变量：
+
+- `FEISHU_EVENT_KEYS=im.message.receive_v1,out_approval`
+- `FEISHU_EVENT_KEYS=im.message.receive_v1,card.action.trigger`
+- `FEISHU_BOT_AUTO_REPLY=1`
+- `FEISHU_BOT_REPLY_TEXT=已收到，我这边正在处理`
+- `FEISHU_CARD_ACTION_TOAST_TEXT=卡片交互已收到`
+- `FEISHU_LOG_LEVEL=debug`
+
+注意：
+
+- 长连接模式只支持企业自建应用。
+- 新版卡片回调 `card.action.trigger` 可以走长连接；旧版“消息卡片回传交互（旧）”不支持长连接。
+- 事件处理需要在 3 秒内完成，否则飞书会重推。
+- 同一应用多个长连接客户端是集群消费，不是广播。
+
+## 需求提交与异步图更新
+
+控制台现在新增了“需求提交与异步图更新”区块：
+
+- `需求/询问`：先本地暂存，不触发图更新。
+- `候选人暂存`：先保存候选人和岗位摘要，不立即运行图谱构建。
+- `加入异步图更新队列`：可从候选人详情里把真实飞书候选人加入延迟处理队列。
+- `集中处理时间窗口数据`：按时间窗口批处理暂存数据；处理阶段才运行图相关流程。
+
+这条链路默认只做本地暂存和确定性批处理，不自动写飞书、不自动录用/淘汰。
 
 ## 技术约束
 

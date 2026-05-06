@@ -62,6 +62,14 @@ import {
   redactLiveAnalyticsReportResult,
   redactWorkEvents,
 } from "./redaction.js";
+import {
+  enqueueCandidateGraphRefresh,
+  enqueueCandidateIntake,
+  enqueueOperatorRequest,
+  enqueueSearchQuery,
+  listDeferredQueue,
+  processDeferredQueue,
+} from "./deferred-queue.js";
 import type { OrgOverviewAgentView, OrgOverviewView } from "../types/work-event.js";
 import {
   type CompetitionDemoOptions,
@@ -69,6 +77,9 @@ import {
   buildCompetitionSearchResult,
   buildCompetitionCandidateReview,
 } from "../runtime/competition-demo-view-model.js";
+import { runCompetitionLiveSearch } from "../runtime/competition-live-search.js";
+import { runCompetitionLiveReview } from "../runtime/competition-live-review.js";
+import { runCompetitionAdHocReview } from "../runtime/competition-live-review.js";
 
 const CONTENT_TYPES: Record<string, string> = {
   ".css": "text/css; charset=utf-8",
@@ -273,23 +284,130 @@ async function handleApi(
 
     if (url.pathname === "/api/competition/search" && req.method === "GET") {
       const query = url.searchParams.get("q") ?? "";
-      const result = buildCompetitionSearchResult(query, getCompetitionDemoOptions());
+      const competitionOptions = getCompetitionDemoOptions();
+      let result;
+      if (query.trim()) {
+        try {
+          result = await runCompetitionLiveSearch(query, {
+            competitionRoot: competitionOptions.competitionRoot ?? "/data/competition",
+          });
+        } catch {
+          result = buildCompetitionSearchResult(query, competitionOptions);
+        }
+      } else {
+        result = buildCompetitionSearchResult(query, competitionOptions);
+      }
       jsonResponse(res, result);
       return;
     }
 
     if (url.pathname === "/api/competition/review" && req.method === "GET") {
       const candidateId = url.searchParams.get("candidateId") ?? "";
+      const query = url.searchParams.get("q") ?? "";
       if (!candidateId) {
         errorResponse(res, 400, "candidateId 参数不能为空");
         return;
       }
-      const review = buildCompetitionCandidateReview(candidateId, getCompetitionDemoOptions());
+      const review = buildCompetitionCandidateReview(candidateId, { ...getCompetitionDemoOptions(), query });
       if (!review) {
         errorResponse(res, 404, "未找到该候选人");
         return;
       }
       jsonResponse(res, review);
+      return;
+    }
+
+    if (url.pathname === "/api/competition/reviewer-live" && req.method === "GET") {
+      const candidateId = url.searchParams.get("candidateId") ?? "";
+      if (!candidateId) {
+        errorResponse(res, 400, "candidateId 参数不能为空");
+        return;
+      }
+      const competitionOptions = getCompetitionDemoOptions();
+      try {
+        const review = await runCompetitionLiveReview(candidateId, {
+          competitionRoot: competitionOptions.competitionRoot ?? "/data/competition",
+        });
+        if (!review) {
+          errorResponse(res, 404, "未找到该候选人");
+          return;
+        }
+        jsonResponse(res, review);
+      } catch {
+        const review = buildCompetitionCandidateReview(candidateId, competitionOptions);
+        if (!review) {
+          errorResponse(res, 404, "未找到该候选人");
+          return;
+        }
+        jsonResponse(res, {
+          ...review,
+          reviewerDecision: {
+            decision: null,
+            confidence: null,
+            reasonLabel: null,
+            reasonGroup: null,
+            reviewSummary: "实时 Reviewer RAG 不可用，已回退到本地图谱复核视图。",
+          },
+          reviewerSignals: {
+            topGeneralSignals: review.matchedFeatures.slice(0, 5),
+            topNeighbors: review.similarCandidates.slice(0, 4),
+            queryAwareSubgraph: null,
+            rawProjection: review.graphProjection,
+          },
+        });
+      }
+      return;
+    }
+
+    if (url.pathname === "/api/competition/reviewer-ad-hoc" && req.method === "POST") {
+      if (!isLocalRequest(req)) {
+        errorResponse(res, 403, "仅允许本地访问");
+        return;
+      }
+      if (!requireJsonContentType(req, res)) {
+        return;
+      }
+
+      let body: Record<string, unknown>;
+      try {
+        body = await parseJsonBody(req);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "";
+        if (msg.includes("too large")) {
+          errorResponse(res, 413, "请求体过大");
+        } else {
+          errorResponse(res, 400, "请求格式错误");
+        }
+        return;
+      }
+
+      const role = typeof body.role === "string" ? body.role.trim() : "";
+      const jobDescription = typeof body.jobDescription === "string" ? body.jobDescription.trim() : "";
+      const resumeText = typeof body.resumeText === "string" ? body.resumeText.trim() : "";
+      const candidateLabel = typeof body.candidateLabel === "string" ? body.candidateLabel.trim() : "临时候选人";
+
+      if (!role || !jobDescription || !resumeText) {
+        errorResponse(res, 400, "role / jobDescription / resumeText 不能为空");
+        return;
+      }
+
+      try {
+        const competitionOptions = getCompetitionDemoOptions();
+        const review = await runCompetitionAdHocReview(
+          {
+            role,
+            jobDescription,
+            resumeText,
+            candidateLabel,
+          },
+          {
+            competitionRoot: competitionOptions.competitionRoot ?? "/data/competition",
+          },
+        );
+        jsonResponse(res, review);
+      } catch {
+        errorResponse(res, 500, "临时简历复核失败");
+      }
       return;
     }
     if (url.pathname === "/api/demo/pipeline" && req.method === "GET") {
@@ -354,6 +472,189 @@ async function handleApi(
     if (url.pathname === "/api/live/records" && req.method === "GET") {
       const table = url.searchParams.get("table") ?? "";
       const result = await listLiveRecords(table);
+      jsonResponse(res, result);
+      return;
+    }
+
+    // ── Deferred Queue: Save-first, batch graph updates ──
+
+    if (url.pathname === "/api/deferred-queue" && req.method === "GET") {
+      jsonResponse(res, listDeferredQueue());
+      return;
+    }
+
+    if (url.pathname === "/api/deferred-queue/operator-request" && req.method === "POST") {
+      if (!isLocalRequest(req)) {
+        errorResponse(res, 403, "仅允许本地访问");
+        return;
+      }
+      if (!requireJsonContentType(req, res)) {
+        return;
+      }
+
+      let body: Record<string, unknown>;
+      try {
+        body = await parseJsonBody(req);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "";
+        if (msg.includes("too large")) {
+          errorResponse(res, 413, "请求体过大");
+        } else {
+          errorResponse(res, 400, "请求格式错误");
+        }
+        return;
+      }
+
+      try {
+        const result = enqueueOperatorRequest({
+          title: typeof body.title === "string" ? body.title : "",
+          content: typeof body.content === "string" ? body.content : "",
+          requestedBy: typeof body.requestedBy === "string" ? body.requestedBy : null,
+        });
+        jsonResponse(res, result);
+      } catch (err: unknown) {
+        errorResponse(res, 400, err instanceof Error ? err.message : "请求格式错误");
+      }
+      return;
+    }
+
+    if (url.pathname === "/api/deferred-queue/candidate-intake" && req.method === "POST") {
+      if (!isLocalRequest(req)) {
+        errorResponse(res, 403, "仅允许本地访问");
+        return;
+      }
+      if (!requireJsonContentType(req, res)) {
+        return;
+      }
+
+      let body: Record<string, unknown>;
+      try {
+        body = await parseJsonBody(req);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "";
+        if (msg.includes("too large")) {
+          errorResponse(res, 413, "请求体过大");
+        } else {
+          errorResponse(res, 400, "请求格式错误");
+        }
+        return;
+      }
+
+      try {
+        const result = enqueueCandidateIntake({
+          displayName: typeof body.displayName === "string" ? body.displayName : "",
+          candidateId: typeof body.candidateId === "string" ? body.candidateId : null,
+          jobId: typeof body.jobId === "string" ? body.jobId : null,
+          jobTitle: typeof body.jobTitle === "string" ? body.jobTitle : "",
+          resumeText: typeof body.resumeText === "string" ? body.resumeText : "",
+          jobRequirements: typeof body.jobRequirements === "string" ? body.jobRequirements : "",
+          jobRubric: typeof body.jobRubric === "string" ? body.jobRubric : null,
+        });
+        jsonResponse(res, result);
+      } catch (err: unknown) {
+        errorResponse(res, 400, err instanceof Error ? err.message : "请求格式错误");
+      }
+      return;
+    }
+
+    if (url.pathname === "/api/deferred-queue/search-query" && req.method === "POST") {
+      if (!isLocalRequest(req)) {
+        errorResponse(res, 403, "仅允许本地访问");
+        return;
+      }
+      if (!requireJsonContentType(req, res)) {
+        return;
+      }
+
+      let body: Record<string, unknown>;
+      try {
+        body = await parseJsonBody(req);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "";
+        if (msg.includes("too large")) {
+          errorResponse(res, 413, "请求体过大");
+        } else {
+          errorResponse(res, 400, "请求格式错误");
+        }
+        return;
+      }
+
+      try {
+        const result = enqueueSearchQuery({
+          query: typeof body.query === "string" ? body.query : "",
+          resultSummary: typeof body.resultSummary === "string" ? body.resultSummary : null,
+          topCandidateIds: Array.isArray(body.topCandidateIds)
+            ? body.topCandidateIds.filter((item): item is string => typeof item === "string")
+            : [],
+        });
+        jsonResponse(res, result);
+      } catch (err: unknown) {
+        errorResponse(res, 400, err instanceof Error ? err.message : "请求格式错误");
+      }
+      return;
+    }
+
+    const deferredCandidateMatch = /^\/api\/deferred-queue\/candidates\/(lnk_live_[a-z0-9]+)\/enqueue-graph-refresh$/.exec(url.pathname);
+    if (deferredCandidateMatch && deferredCandidateMatch[1] && req.method === "POST") {
+      if (!isLocalRequest(req)) {
+        errorResponse(res, 403, "仅允许本地访问");
+        return;
+      }
+      if (!requireJsonContentType(req, res)) {
+        return;
+      }
+
+      let body: Record<string, unknown>;
+      try {
+        body = await parseJsonBody(req);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "";
+        if (msg.includes("too large")) {
+          errorResponse(res, 413, "请求体过大");
+        } else {
+          errorResponse(res, 400, "请求格式错误");
+        }
+        return;
+      }
+
+      try {
+        const result = enqueueCandidateGraphRefresh({
+          linkId: deferredCandidateMatch[1],
+          displayName: typeof body.displayName === "string" ? body.displayName : null,
+        });
+        jsonResponse(res, result);
+      } catch (err: unknown) {
+        errorResponse(res, 400, err instanceof Error ? err.message : "请求格式错误");
+      }
+      return;
+    }
+
+    if (url.pathname === "/api/deferred-queue/process" && req.method === "POST") {
+      if (!isLocalRequest(req)) {
+        errorResponse(res, 403, "仅允许本地访问");
+        return;
+      }
+      if (!requireJsonContentType(req, res)) {
+        return;
+      }
+
+      let body: Record<string, unknown>;
+      try {
+        body = await parseJsonBody(req);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "";
+        if (msg.includes("too large")) {
+          errorResponse(res, 413, "请求体过大");
+        } else {
+          errorResponse(res, 400, "请求格式错误");
+        }
+        return;
+      }
+
+      const result = await processDeferredQueue({
+        start: typeof body.start === "string" ? body.start : undefined,
+        end: typeof body.end === "string" ? body.end : undefined,
+      });
       jsonResponse(res, result);
       return;
     }

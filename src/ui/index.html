@@ -57,7 +57,7 @@
     <!-- Block 0: Hero Narrative Area -->
     <section class="hero-section anim-fade-up">
       <h1 class="hero-title">7 位 Agent 员工，围绕飞书 Base 接力招聘</h1>
-      <p class="hero-subtitle">真实读取飞书多维表格，安全回放 Agent 接力，Graph RAG 提供可解释筛选证据。</p>
+      <p class="hero-subtitle">真实读取飞书多维表格，安全回放 Agent 接力，Graph RAG 和 Graph Based Memory 提供可解释筛选证据。</p>
       <div class="hero-capsules">
         <span class="hero-capsule">简历录入</span>
         <span class="hero-capsule">信息抽取</span>
@@ -85,25 +85,41 @@
       <div id="pipeline-meta-container"></div>
     </section>
 
+    <section class="glass-panel anim-fade-up delay-2" style="padding:20px;" id="graph-scene-switcher">
+      <div class="audit-log-header">
+        <h3 class="audit-log-title">Competition 场景切换</h3>
+        <span class="section-source-hint">搜索候选人 / 单简历复核</span>
+      </div>
+      <div class="graph-scene-toggle">
+        <button type="button" class="graph-scene-btn active" data-graph-scene="search">场景一：候选人搜索</button>
+        <button type="button" class="graph-scene-btn" data-graph-scene="reviewer">场景二：单简历复核</button>
+      </div>
+    </section>
+
     <!-- Block 2: Candidate Grid + Graph RAG Zone -->
-    <section class="glass-panel anim-fade-up delay-2" style="padding:24px;display:flex;flex-direction:column;gap:20px;">
+    <section class="glass-panel anim-fade-up delay-2 graph-scene-section" style="padding:24px;display:flex;flex-direction:column;gap:20px;" id="graph-scene-search">
       <div class="candidate-grid-header">
         <div>
-          <h3 class="candidate-grid-title" id="queue-title">Graph RAG 候选人队列</h3>
-          <p class="candidate-grid-subtitle" id="queue-subtitle">来自 Competition Graph RAG 检索结果，点击卡片进入深度图谱分析</p>
+          <h3 class="candidate-grid-title" id="queue-title">Graph RAG 查询</h3>
+          <p class="candidate-grid-subtitle" id="queue-subtitle">输入自然语言查询后，再展示候选人队列与深度图谱分析</p>
         </div>
         <div class="candidate-search-box">
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
           <input type="text" class="candidate-search-input" id="candidate-search-input" placeholder="搜索候选人...">
         </div>
       </div>
-      <div class="candidate-grid" id="candidate-grid">
+      <div id="graph-search-empty" class="graph-search-empty-state">
+        <div class="graph-search-empty-title">等待查询</div>
+        <div class="graph-search-empty-text">输入岗位、技能、学历或其他自然语言条件后按回车，例如：会 Python、Rust、本科。</div>
+      </div>
+      <div id="graph-search-trace" hidden></div>
+      <div class="candidate-grid" id="candidate-grid" hidden>
         <div class="loading-pulse" style="grid-column:1/-1">正在加载 Graph RAG 数据</div>
       </div>
     </section>
 
     <!-- Block 3: Graph RAG Deep Analysis Zone -->
-    <section class="glass-panel wellfound-panel anim-fade-up delay-3" style="padding:32px 24px;display:flex;flex-direction:column;gap:16px;" id="graph-rag-zone">
+    <section class="glass-panel wellfound-panel anim-fade-up delay-3 graph-scene-section" style="padding:32px 24px;display:flex;flex-direction:column;gap:16px;" id="graph-rag-zone" hidden>
       <div class="graph-rag-header">
         <div>
           <h3 class="graph-rag-title">Graph RAG 深度图谱分析</h3>
@@ -112,6 +128,43 @@
       </div>
       <div class="graph-canvas" id="graph-canvas">
         <div class="graph-canvas-empty">← 点击上方候选人卡片以查看图谱深度分析</div>
+      </div>
+    </section>
+
+    <section class="glass-panel wellfound-panel anim-fade-up delay-3 graph-scene-section" style="padding:24px;display:flex;flex-direction:column;gap:18px;" id="graph-scene-reviewer" hidden>
+      <div class="graph-rag-header">
+        <div>
+          <h3 class="graph-rag-title">单简历复核场景</h3>
+          <p class="graph-rag-hint">来了一份简历后，招聘人员可结合岗位记忆、候选人画像、邻居证据、图投影和 LLM Reviewer 判断是否建议录取。</p>
+        </div>
+      </div>
+      <div class="reviewer-workbench">
+        <div class="reviewer-control-panel">
+          <div class="deferred-panel-title">复核输入</div>
+          <p class="deferred-panel-hint">当前 competition 场景支持两种复核：已有候选人复核，或按 competition 格式填空新建一份简历后即时复核。</p>
+          <div class="deferred-mode-switch">
+            <button type="button" class="deferred-mode-btn active" data-reviewer-mode="existing">复核已有候选人</button>
+            <button type="button" class="deferred-mode-btn" data-reviewer-mode="new">填空新建简历</button>
+          </div>
+          <div id="reviewer-existing-mode">
+          <div class="reviewer-input-row">
+            <input id="reviewer-candidate-id" class="deferred-input" type="text" placeholder="输入候选人 ID，例如 CAN-002731">
+            <button type="button" class="detail-action-btn" id="reviewer-load-selected-btn">带入当前候选人</button>
+          </div>
+          <button type="button" class="detail-action-btn detail-action-btn-warn" id="reviewer-run-btn">开始复核</button>
+          </div>
+          <form id="reviewer-ad-hoc-form" class="deferred-form" hidden>
+            <input id="reviewer-ad-hoc-label" class="deferred-input" type="text" placeholder="候选人显示名（可选）">
+            <input id="reviewer-ad-hoc-role" class="deferred-input" type="text" placeholder="Role / 目标岗位，例如 Blockchain Developer" required>
+            <textarea id="reviewer-ad-hoc-job-description" class="deferred-textarea" placeholder="Job_Description / 岗位描述" required></textarea>
+            <textarea id="reviewer-ad-hoc-resume" class="deferred-textarea" placeholder="Resume / 简历正文" required></textarea>
+            <button type="submit" class="detail-action-btn detail-action-btn-warn">新建简历并开始复核</button>
+          </form>
+          <div id="reviewer-history-note" class="section-source-hint">Reviewer RAG 将基于 competition 图谱快照和 LLM 进行判断。</div>
+        </div>
+        <div class="reviewer-result-panel" id="reviewer-result-panel">
+          <div class="graph-canvas-empty">输入候选人 ID 或带入当前候选人后开始复核</div>
+        </div>
       </div>
     </section>
 
@@ -154,13 +207,36 @@
     </section>
 
     <!-- Block 6: Operator Tasks -->
-    <section class="glass-panel anim-fade-up delay-3" style="padding:20px;">
+    <section class="glass-panel anim-fade-up delay-3" style="padding:20px;" id="operator-tasks-section">
       <div class="audit-log-header">
         <h3 class="audit-log-title">操作员任务清单</h3>
         <span class="section-source-hint">当前为只读 · 真实执行须人工授权</span>
       </div>
       <div id="operator-tasks-container">
         <div class="loading-pulse">正在加载任务清单</div>
+      </div>
+    </section>
+
+    <section class="glass-panel anim-fade-up delay-3" style="padding:20px;" id="deferred-queue-section">
+      <div class="audit-log-header">
+        <h3 class="audit-log-title">历史查询与一键同步</h3>
+        <span class="section-source-hint">搜索会自动保存 · 需要时一键同步</span>
+      </div>
+      <div class="deferred-grid">
+        <div class="deferred-panel">
+          <div class="deferred-panel-title">自动保存的历史查询</div>
+          <p class="deferred-panel-hint">你在上方 Graph RAG 搜索框中的查询会自动保存到这里，不需要额外提交入口。</p>
+          <div id="deferred-query-history"><div class="loading-pulse">正在加载历史查询</div></div>
+        </div>
+
+        <div class="deferred-panel">
+          <div class="deferred-panel-title">一键同步数据</div>
+          <p class="deferred-panel-hint">需要时再统一同步暂存数据。同步阶段才会集中处理待同步项。</p>
+          <button type="button" class="detail-action-btn detail-action-btn-warn" id="deferred-process-btn">一键同步数据</button>
+          <div id="deferred-process-result" class="detail-zone-result"></div>
+          <div id="deferred-queue-summary"></div>
+          <div id="deferred-queue-list"><div class="loading-pulse">正在加载同步摘要</div></div>
+        </div>
       </div>
     </section>
 

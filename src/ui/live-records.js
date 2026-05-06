@@ -16,16 +16,45 @@ export function renderLiveBaseStatus(data) {
   } else {
     const reasons = (data && data.blockedReasons) ? data.blockedReasons : ["飞书连接未配置"];
     const reasonItems = reasons.map(function (r) { return "<li>" + esc(r) + "</li>"; }).join("");
+    const checks = data && data.checks ? data.checks : null;
+    var checkHtml = "";
+    if (checks) {
+      checkHtml += '<div class="live-status-checks">';
+      checkHtml += renderCheckItem("lark-cli", checks.cliAvailable);
+      checkHtml += renderCheckItem("HIRELOOP_ALLOW_LARK_READ", checks.allowLarkRead);
+      checkHtml += renderCheckItem("LARK_APP_ID", checks.larkAppId);
+      checkHtml += renderCheckItem("LARK_APP_SECRET", checks.larkAppSecret);
+      checkHtml += renderCheckItem("BASE_APP_TOKEN", checks.baseAppToken);
+      checkHtml += "</div>";
+    }
+    var title = "飞书未连接";
+    var subtitle = "只读未启用";
+    if (data && data.readiness === "partial") {
+      title = "飞书部分已配置";
+      subtitle = "已保存部分配置，但实时只读尚未就绪";
+    }
     el.innerHTML =
       '<div class="live-status-blocked">' +
       '<div style="display:flex;align-items:center;gap:10px">' +
       '<span class="live-status-icon blocked">&#10007;</span>' +
-      '<span class="live-status-text"><strong>飞书未连接</strong> &middot; 只读未启用</span>' +
+      '<span class="live-status-text"><strong>' + esc(title) + '</strong> &middot; ' + esc(subtitle) + "</span>" +
       "</div>" +
+      checkHtml +
       '<ul class="live-status-reasons">' + reasonItems + "</ul>" +
       "</div>";
-    if (hint) hint.textContent = "请配置 LARK_APP_ID / LARK_APP_SECRET / BASE_APP_TOKEN 并设置 HIRELOOP_ALLOW_LARK_READ=1";
+    if (hint) {
+      hint.textContent = data && data.readiness === "partial"
+        ? "补齐缺失项后即可切到飞书 Base 实时只读"
+        : "请配置 LARK_APP_ID / LARK_APP_SECRET / BASE_APP_TOKEN 并设置 HIRELOOP_ALLOW_LARK_READ=1";
+    }
   }
+}
+
+function renderCheckItem(label, ok) {
+  return '<span class="live-status-check ' + (ok ? "ok" : "missing") + '">' +
+    '<span class="live-status-check-dot">' + (ok ? "✓" : "✗") + "</span>" +
+    esc(label) +
+    "</span>";
 }
 
 export function renderLiveRecords(containerId, records, title, colName, colMeta, colExtra, options) {

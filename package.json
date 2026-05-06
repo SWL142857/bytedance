@@ -5,8 +5,8 @@
   "description": "AI-powered recruitment assistant built on Lark Base",
   "scripts": {
     "build": "tsc",
-    "test": "node --import tsx --test \"src/**/*.test.ts\" \"tests/**/*.test.ts\"",
-    "test:watch": "node --import tsx --test --watch \"src/**/*.test.ts\" \"tests/**/*.test.ts\"",
+    "test": "node --import tsx scripts/run-tests.ts",
+    "test:watch": "node --import tsx scripts/run-tests.ts --watch",
     "typecheck": "tsc --noEmit",
     "base:plan": "node --import tsx scripts/plan-base.ts",
     "base:seed:dry-run": "node --import tsx scripts/seed-base.ts",
@@ -44,6 +44,7 @@
     "dataset:run": "node --import tsx scripts/run-live-agent-dataset.ts",
     "provider:dataset-verify": "node --import tsx scripts/run-provider-dataset-verify.ts",
     "competition:rag:prepare": "node --import tsx scripts/prepare-competition-rag.ts",
+    "feishu:events:long": "node --import tsx scripts/start-feishu-long-connection.ts",
     "ui:dev": "node --import tsx scripts/start-ui-server.ts",
     "scan:forbidden-traces": "node --import tsx scripts/run-forbidden-trace-scan.ts"
   },
@@ -63,5 +64,8 @@
     "@types/node": "^22.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0"
+  },
+  "dependencies": {
+    "@larksuiteoapi/node-sdk": "^1.62.1"
   }
 }
