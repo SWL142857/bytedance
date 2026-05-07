@@ -28,8 +28,8 @@ export function buildOperatorTasksOverview(): OperatorTasksOverviewView {
     {
       task_kind: "live_readiness_report",
       category: "readiness",
-      display_name: "Live 写入就绪报告",
-      description: "检查配置、解析、记录、写入计划与命令校验，不执行任何写命令。",
+      display_name: "后端写入守卫报告",
+      description: "检查配置、解析、记录、写入计划与命令校验，只读展示守卫状态。",
       availability: "available_readonly",
       execute_enabled: false,
       guard_summary: "默认 sample 模式，只生成只读 readiness summary。",

@@ -13,7 +13,7 @@ function statusClassFor(status) {
 function statusLabelFor(status) {
   if (status === "工作中") return "工作中";
   if (status === "需要人工处理") return "需人工";
-  if (status === "阻塞") return "阻塞";
+  if (status === "阻塞") return "等待人工确认";
   return "待命";
 }
 

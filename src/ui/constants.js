@@ -117,7 +117,7 @@ export const TEXT_LABELS_DISPLAY = {
   "add provider error mapping": "新增供应商错误映射",
   "add schema retry wiring behind existing output contracts": "在现有输出契约后接入结构重试",
   "changing candidate status flow": "修改候选人状态流",
-  "relaxing guarded live write conditions": "放松在线写入守卫条件",
+  "relaxing guarded live write conditions": "放松后端写入守卫条件",
   "writing raw prompts, resumes, or credentials to output": "向输出写入原始提示词、简历或凭据",
   "bypassing schema validation": "绕过结构校验",
   "enabling external model calls by default": "默认启用外部模型调用",
@@ -140,27 +140,27 @@ export const EVENT_TYPE_LABELS = {
   retry: "重试",
   error: "错误",
   human_action: "人工操作",
-  blocked: "已阻止",
+  blocked: "写入被安全拦截",
 };
 
 export const EXECUTION_MODE_LABELS = {
   dry_run: "干跑",
   live_read: "在线只读",
-  live_write: "在线写入",
-  blocked: "已阻止",
+  live_write: "后端写入审计",
+  blocked: "写入被安全拦截",
 };
 
 export const SAFE_ERROR_MSG = "信息不可用，请稍后重试";
 
 export const GUARD_STATUS_LABELS = {
   passed: "已通过",
-  blocked: "已阻止",
+  blocked: "写入被安全拦截",
   skipped: "已跳过",
 };
 
 export const TOOL_TYPE_LABELS = {
   record_list: "读取记录",
-  record_upsert: "写入记录",
+  record_upsert: "记录变更计划",
   table_create: "建表",
   llm_call: "模型调用",
 };
@@ -183,7 +183,7 @@ export const EVENT_VERB_BY_TYPE = {
   retry: "触发重试",
   error: "记录错误",
   human_action: "完成人工操作",
-  blocked: "阻断写入",
+  blocked: "写入被安全拦截",
 };
 
 export const AVATAR_CLASS_BY_AGENT = {

@@ -786,6 +786,222 @@ describe("server API routes", () => {
     }
   });
 
+  it("analytics-report.js does not expose execute-report route or execute confirm tokens", async () => {
+    const res = await fetch(`${BASE_URL}/analytics-report.js`);
+    const text = await res.text();
+
+    // Must NOT contain the execute endpoint
+    assert.ok(!text.includes("execute-report"), "analytics-report.js must not reference /api/live/analytics/execute-report");
+
+    // Must NOT contain analytics write confirmation tokens
+    assert.ok(!text.includes("EXECUTE_LIVE_ANALYTICS_REPORT_WRITE"), "analytics-report.js must not contain EXECUTE_LIVE_ANALYTICS_REPORT_WRITE");
+    assert.ok(!text.includes("REVIEWED_LIVE_ANALYTICS_REPORT_PLAN"), "analytics-report.js must not contain REVIEWED_LIVE_ANALYTICS_REPORT_PLAN");
+
+    // Must contain the plan endpoint (this is the allowed read-only route)
+    assert.ok(text.includes("generate-report-plan"), "analytics-report.js should reference generate-report-plan");
+    assert.ok(text.includes("/api/competition/overview"), "analytics-report.js should use read-only competition overview fallback");
+    assert.ok(text.includes("服务器镜像分析预览"), "analytics-report.js should explain blocked-plan fallback");
+
+    // Must contain read-only boundary markers
+    assert.ok(text.includes("只生成计划，不执行写入") || text.includes("只读"), "analytics-report.js must include read-only boundary text");
+    assert.ok(text.includes("不执行写入"), "analytics fallback must preserve no-write wording");
+  });
+
+  it("analytics-report.js is served as JavaScript", async () => {
+    const res = await fetch(`${BASE_URL}/analytics-report.js`);
+    assert.ok(res.ok);
+    assert.ok(res.headers.get("content-type")?.includes("javascript"), "analytics-report.js must be served as JS");
+  });
+
+  it("index.html analytics panel does not contain execute tokens or route", async () => {
+    const res = await fetch(`${BASE_URL}/`);
+    const text = await res.text();
+
+    // Must NOT contain execute analytics route or tokens in HTML
+    assert.ok(!text.includes("execute-report"), "index.html must not contain execute-report");
+    assert.ok(!text.includes("EXECUTE_LIVE_ANALYTICS_REPORT_WRITE"), "index.html must not contain analytics execute confirm token");
+    assert.ok(!text.includes("REVIEWED_LIVE_ANALYTICS_REPORT_PLAN"), "index.html must not contain analytics review confirm token");
+
+    // Must NOT contain literal EXECUTE + REVIEWED (should use safe wording)
+    assert.ok(!text.includes("EXECUTE + REVIEWED"), "index.html must not contain literal EXECUTE + REVIEWED");
+    assert.ok(text.includes("后端双确认 + planNonce"), "index.html must use 后端双确认 + planNonce wording");
+
+    // Must contain read-only boundary text in analytics panel
+    assert.ok(text.includes("仅生成计划，不执行写入") || text.includes("只生成计划，不执行写入"), "index.html analytics panel must include read-only boundary text");
+    assert.ok(text.includes("planNonce"), "index.html analytics panel must reference planNonce");
+  });
+
+  it("server-data-readiness.js does not expose execute routes or confirm tokens", async () => {
+    const res = await fetch(`${BASE_URL}/server-data-readiness.js`);
+    const text = await res.text();
+
+    // Must NOT contain any execute route
+    assert.ok(!text.includes("execute-report"), "server-data-readiness.js must not contain execute-report");
+    assert.ok(!text.includes("execute-writes"), "server-data-readiness.js must not contain execute-writes");
+    assert.ok(!text.includes("execute-human-decision"), "server-data-readiness.js must not contain execute-human-decision");
+
+    // Must NOT contain analytics or write confirm tokens
+    assert.ok(!text.includes("EXECUTE_LIVE"), "server-data-readiness.js must not contain EXECUTE_LIVE");
+    assert.ok(!text.includes("REVIEWED_"), "server-data-readiness.js must not contain REVIEWED_");
+
+    // Must NOT contain sensitive fields
+    assert.ok(!text.includes("token"), "server-data-readiness.js must not contain token");
+    assert.ok(!text.includes("secret"), "server-data-readiness.js must not contain secret");
+    assert.ok(!text.includes("payload"), "server-data-readiness.js must not contain payload");
+    assert.ok(!text.includes("stdout"), "server-data-readiness.js must not contain stdout");
+    assert.ok(!text.includes("stderr"), "server-data-readiness.js must not contain stderr");
+    assert.ok(!text.includes("table_id"), "server-data-readiness.js must not contain table_id");
+    assert.ok(!text.includes("record_id"), "server-data-readiness.js must not contain record_id");
+
+    // Must reference the correct read-only APIs
+    assert.ok(text.includes("/api/competition/overview"), "server-data-readiness.js must reference /api/competition/overview");
+    assert.ok(text.includes("/api/live/base-status"), "server-data-readiness.js must reference /api/live/base-status");
+
+    // Must contain write boundary logic (not hardcoded closed)
+    assert.ok(text.includes("writeDisabled"), "server-data-readiness.js must reference writeDisabled dynamically");
+    assert.ok(text.includes("写入关闭") || text.includes("写入开关已打开") || text.includes("无执行入口"), "server-data-readiness.js must reference write boundary text");
+    assert.ok(text.includes("writeLabel"), "server-data-readiness.js must use writeLabel variable for dynamic rendering");
+    assert.ok(text.includes("writeCls"), "server-data-readiness.js must use writeCls variable for dynamic styling");
+    assert.ok(text.includes("Graph RAG"), "server-data-readiness.js must reference Graph RAG");
+  });
+
+  it("agent-tool-trace.js does not expose execute routes or confirm tokens", async () => {
+    const res = await fetch(`${BASE_URL}/agent-tool-trace.js`);
+    const text = await res.text();
+
+    // Must NOT contain execute routes as URL paths or bare tool names
+    assert.ok(!text.includes("/execute-report"), "agent-tool-trace.js must not contain /execute-report path");
+    assert.ok(!text.includes("/execute-writes"), "agent-tool-trace.js must not contain /execute-writes path");
+    assert.ok(!text.includes("/execute-human-decision"), "agent-tool-trace.js must not contain /execute-human-decision path");
+    assert.ok(!text.includes("execute-human-decision"), "agent-tool-trace.js must not contain bare execute-human-decision string");
+
+    // Must NOT contain confirm tokens
+    assert.ok(!text.includes("EXECUTE_LIVE"), "agent-tool-trace.js must not contain EXECUTE_LIVE");
+    assert.ok(!text.includes("REVIEWED_"), "agent-tool-trace.js must not contain REVIEWED_");
+
+    // Must NOT contain sensitive fields
+    assert.ok(!text.includes("payload"), "agent-tool-trace.js must not contain payload");
+    assert.ok(!text.includes("stdout"), "agent-tool-trace.js must not contain stdout");
+    assert.ok(!text.includes("stderr"), "agent-tool-trace.js must not contain stderr");
+    assert.ok(!text.includes("table_id"), "agent-tool-trace.js must not contain table_id");
+    assert.ok(!text.includes("record_id"), "agent-tool-trace.js must not contain record_id");
+    assert.ok(!text.includes("token"), "agent-tool-trace.js must not contain token");
+    assert.ok(!text.includes("secret"), "agent-tool-trace.js must not contain secret");
+
+    // Must reference the allowed read-only APIs
+    assert.ok(text.includes("/api/competition/overview"), "agent-tool-trace.js must reference /api/competition/overview");
+    assert.ok(text.includes("/api/work-events"), "agent-tool-trace.js must reference /api/work-events");
+
+    // Must contain read-only boundary text
+    assert.ok(text.includes("只读"), "agent-tool-trace.js must include 只读 boundary");
+    assert.ok(text.includes("双确认"), "agent-tool-trace.js must include 双确认 boundary");
+    assert.ok(text.includes("planNonce"), "agent-tool-trace.js must reference planNonce");
+
+    // Must contain source mode labels (demo-appropriate, not claiming real)
+    assert.ok(text.includes("审计轨迹示例"), "agent-tool-trace.js must include 审计轨迹示例 for demo mode");
+    assert.ok(text.includes("流程蓝图"), "agent-tool-trace.js must include 流程蓝图 label");
+
+    // Must contain read-only enforcement text
+    assert.ok(text.includes("前端无执行入口"), "agent-tool-trace.js must include 前端无执行入口");
+
+    // live_write must be presented as backend audit, not frontend write
+    assert.ok(text.includes("后端写入审计"), "agent-tool-trace.js must use 后端写入审计 for live_write mode");
+    assert.ok(!text.includes("在线写入"), "agent-tool-trace.js must not contain 在线写入 (misleading)");
+  });
+
+  it("agent-tool-trace.js detects demo events and avoids misleading titles", async () => {
+    const res = await fetch(`${BASE_URL}/agent-tool-trace.js`);
+    const text = await res.text();
+
+    // Must check execution_mode to detect demo vs real
+    assert.ok(text.includes("dry_run"), "agent-tool-trace.js must check execution_mode");
+
+    // Must have demo-appropriate label
+    assert.ok(text.includes("审计轨迹示例"), "agent-tool-trace.js must use 审计轨迹示例 for demo events");
+  });
+
+  it("UI modules avoid misleading blocked/stale copy in demo mode", async () => {
+    // Check display modules that render blocked status
+    const displayFiles = ["agent-tool-trace.js", "org-relay.js", "agent-cards.js"];
+    for (var f = 0; f < displayFiles.length; f++) {
+      const res = await fetch(`${BASE_URL}/${displayFiles[f]}`);
+      const text = await res.text();
+
+      // Must NOT display "堵塞" to judges (safe semantic instead)
+      assert.ok(!text.includes("堵塞"), `${displayFiles[f]} must not contain 堵塞`);
+
+      // Must use safe blocked copy
+      var hasSafeBlocked = text.includes("等待人工确认") || text.includes("写入被安全拦截") || text.includes("守卫已生效");
+      assert.ok(hasSafeBlocked, `${displayFiles[f]} must use safe blocked copy`);
+    }
+
+    // constants.js (shared label source) must also use safe copy
+    const constRes = await fetch(`${BASE_URL}/constants.js`);
+    const constText = await constRes.text();
+    assert.ok(!constText.includes("堵塞"), "constants.js must not contain 堵塞");
+    assert.ok(constText.includes("写入被安全拦截") || constText.includes("等待人工确认"), "constants.js must use safe blocked labels");
+
+    // work-events.js must show "演示快照" for demo/blocked events, not just dry_run
+    const wevRes = await fetch(`${BASE_URL}/work-events.js`);
+    const wevText = await wevRes.text();
+    assert.ok(wevText.includes("演示快照"), "work-events.js must show 演示快照 for demo events");
+    assert.ok(wevText.includes('"blocked"') || wevText.includes("demo_only"), "work-events.js must handle blocked and demo_only events too");
+  });
+
+  it("constants.js does not contain raw 已阻止 as EVENT_TYPE_LABELS value", async () => {
+    const res = await fetch(`${BASE_URL}/constants.js`);
+    const text = await res.text();
+    // EVENT_TYPE_LABELS.blocked should use safe wording, not raw "已阻止"
+    // Check that the blocked key in EVENT_TYPE_LABELS maps to 写入被安全拦截
+    assert.ok(!text.includes('"已阻止"') && !text.includes("'已阻止'"), "constants.js must not use 已阻止 as a standalone label value");
+    assert.ok(text.includes("写入被安全拦截"), "constants.js must include 写入被安全拦截");
+  });
+
+  it("index.html and UI contain safety boundary markers, not misleading copy", async () => {
+    const htmlRes = await fetch(`${BASE_URL}/`);
+    const htmlText = await htmlRes.text();
+
+    // Must NOT display misleading time copy
+    assert.ok(!htmlText.includes("天前"), "index.html must not contain stale 天前 text");
+    assert.ok(!htmlText.includes("堵塞"), "index.html must not contain 堵塞");
+
+    // Must contain safety markers
+    assert.ok(htmlText.includes("前端无执行入口") || htmlText.includes("不执行写入"), "index.html must include safety boundary");
+    assert.ok(htmlText.includes("双确认") || htmlText.includes("人工确认"), "index.html must include human confirmation boundary");
+  });
+
+  it("index.html agent tool trace section surfaces correct markers", async () => {
+    const res = await fetch(`${BASE_URL}/`);
+    const text = await res.text();
+
+    // Section must exist with dynamic heading container
+    assert.ok(text.includes("agent-tool-trace-section"), "index.html must include agent tool trace section");
+    assert.ok(text.includes("agent-tool-trace-heading"), "index.html must include agent tool trace heading container");
+
+    // Must contain innovation narrative markers
+    assert.ok(text.includes("Agent 工具轨迹"), "index.html must include Agent 工具轨迹 title");
+
+    // Must NOT contain execute routes in the section
+
+    // Must NOT contain execute routes in the section
+    assert.ok(!text.includes("execute-report"), "index.html must not contain execute-report");
+  });
+
+  it("index.html server data readiness section surfaces correct labels", async () => {
+    const res = await fetch(`${BASE_URL}/`);
+    const text = await res.text();
+
+    // Must contain the section marker
+    assert.ok(text.includes("server-data-readiness-section"), "index.html must include server data readiness section");
+
+    // Must contain the two API labels
+    assert.ok(text.includes("/api/competition/overview"), "index.html must reference competition overview API");
+    assert.ok(text.includes("/api/live/base-status"), "index.html must reference live base-status API");
+
+    // Must NOT contain execute or write routes
+    assert.ok(!text.includes("server-data-readiness-section") || !text.includes("execute-report", text.indexOf("server-data-readiness-section")), "server data section must not reference execute-report");
+  });
+
   it("analytics responses use safe Chinese error messages", async () => {
     const res = await fetch(`${BASE_URL}/api/live/analytics/execute-report`, {
       method: "POST",
@@ -1065,6 +1281,9 @@ describe("server API routes", () => {
       "agent-cards.js",
       "org-relay.js",
       "agent-relay-player.js",
+      "analytics-report.js",
+      "server-data-readiness.js",
+      "agent-tool-trace.js",
     ];
     for (const mod of modules) {
       const res = await fetch(`${BASE_URL}/${mod}`);
@@ -1151,6 +1370,38 @@ describe("server API routes", () => {
     }
   });
 
+  it("index.html appendix sections are hidden by default for demo focus", async () => {
+    const res = await fetch(`${BASE_URL}/`);
+    const text = await res.text();
+
+    // These sections must exist but be hidden by default
+    var hiddenSections = [
+      "live-data-section",
+      "audit-log-section",
+      "operator-tasks-section",
+      "analytics-report-section",
+      "deferred-queue-section",
+    ];
+    for (var i = 0; i < hiddenSections.length; i++) {
+      var id = hiddenSections[i];
+      assert.ok(text.includes('id="' + id + '"'), `index.html must contain ${id}`);
+      // Section should have hidden attribute (either `hidden` or `hidden=""`)
+      var pattern = new RegExp('id="' + id + '"\\s[^>]*hidden');
+      assert.ok(pattern.test(text), `${id} must be hidden by default`);
+    }
+  });
+
+  it("index.html demo focus sections are visible by default", async () => {
+    const res = await fetch(`${BASE_URL}/`);
+    const text = await res.text();
+
+    // These sections must remain visible
+    assert.ok(text.includes('id="server-data-readiness-section"'), "server-data-readiness must exist");
+    assert.ok(text.includes('id="agent-tool-trace-section"'), "agent-tool-trace must exist");
+    assert.ok(text.includes('id="org-relay-section"'), "org-relay must exist");
+    assert.ok(text.includes('id="graph-scene-search"'), "graph-scene-search must exist");
+  });
+
   it("index.html surfaces 真实飞书虚拟组织运行中枢 / 最近活动 sections", async () => {
     const res = await fetch(`${BASE_URL}/`);
     const text = await res.text();
@@ -1198,6 +1449,34 @@ describe("server API routes", () => {
     assert.ok(indexText.includes("飞书只读"), "index.html must render live Feishu data section");
   });
 
+  it("live-records.js shows degradation messages for Base read failures", async () => {
+    const res = await fetch(`${BASE_URL}/live-records.js`);
+    const text = await res.text();
+    // Must contain degradation messages, not raw error
+    assert.ok(text.includes("面板已降级") || text.includes("读取受限") || text.includes("降级到"), "live-records.js must show degradation state");
+    assert.ok(text.includes("Base 数据读取失败") || text.includes("飞书连接未就绪"), "live-records.js must show Base failure reason");
+  });
+
+  it("index.html deferred section uses local-processing copy, not write-sync", async () => {
+    const res = await fetch(`${BASE_URL}/`);
+    const text = await res.text();
+    // Must NOT contain misleading write-sync copy
+    assert.ok(!text.includes("一键同步"), "index.html must not contain 一键同步");
+    // Must contain local-processing copy
+    assert.ok(text.includes("处理本地暂存") || text.includes("本地暂存处理"), "index.html deferred section must say local processing");
+    assert.ok(text.includes("不写飞书") || text.includes("不写入飞书"), "index.html deferred section must state no Base writes");
+  });
+
+  it("index.html console drawer labels avoid write-readiness copy", async () => {
+    const res = await fetch(`${BASE_URL}/`);
+    const text = await res.text();
+    // Must NOT contain misleading write copy
+    assert.ok(!text.includes("写入就绪"), "index.html must not contain 写入就绪");
+    assert.ok(!text.includes("在线写入"), "index.html must not contain 在线写入");
+    // Must contain guard/read-only copy
+    assert.ok(text.includes("后端写入守卫"), "index.html must contain 后端写入守卫");
+  });
+
   it("live records opens candidate detail only from candidate rows", async () => {
     const liveRes = await fetch(`${BASE_URL}/live-records.js`);
     const liveText = await liveRes.text();
@@ -1218,6 +1497,61 @@ describe("server API routes", () => {
     assert.ok(!text.includes("--execute"), "app.js must not embed execute CLI args");
   });
 
+  it("Graph RAG scene switcher keeps appendix sections hidden in demo focus mode", async () => {
+    const res = await fetch(`${BASE_URL}/graph-rag.js`);
+    const text = await res.text();
+    assert.ok(text.includes("clutterSections[c].hidden = true"), "appendix sections must stay hidden for demo focus mode");
+    assert.ok(!text.includes('clutterSections[c].hidden = currentGraphScene !== "search"'), "search scene must not restore hidden appendix sections");
+  });
+
+  it("UI copy describes local staging without implying frontend Feishu sync or resume creation", async () => {
+    const indexRes = await fetch(`${BASE_URL}/`);
+    const indexText = await indexRes.text();
+    const queueRes = await fetch(`${BASE_URL}/async-queue.js`);
+    const queueText = await queueRes.text();
+
+    assert.ok(indexText.includes("历史查询与本地暂存处理"), "index.html should label deferred work as local staging");
+    assert.ok(indexText.includes("处理本地暂存"), "index.html should use local staging action copy");
+    assert.ok(indexText.includes("生成临时复核（不写飞书）"), "new reviewer CTA should explicitly say it does not write Feishu");
+    assert.ok(queueText.includes("正在处理本地暂存数据"), "async queue should describe local processing");
+    assert.ok(queueText.includes("未写入飞书 Base"), "async queue result should state no Feishu write");
+    assert.ok(queueText.includes("待处理"), "async queue status should use processing wording");
+    assert.ok(queueText.includes("当前没有需要处理的暂存数据项"), "async queue empty state should use local staging wording");
+
+    assert.ok(!indexText.includes("一键同步数据"), "index.html must not imply one-click Feishu sync");
+    assert.ok(!indexText.includes("新建简历并开始复核"), "index.html must not imply real resume creation");
+    assert.ok(!indexText.includes("正在加载同步摘要"), "index.html loading text must not imply sync");
+    assert.ok(!queueText.includes("同步中"), "async queue button must not imply Feishu sync");
+    assert.ok(!queueText.includes("正在同步"), "async queue loading copy must not imply Feishu sync");
+    assert.ok(!queueText.includes("已同步"), "async queue status must not imply sync");
+    assert.ok(!queueText.includes("待同步"), "async queue status must not imply sync");
+  });
+
+  it("UI labels backend write surfaces as guarded audit rather than online write", async () => {
+    const modules = ["index.html", "reports.js", "constants.js", "agent-tool-trace.js"];
+    for (const mod of modules) {
+      const res = await fetch(mod === "index.html" ? `${BASE_URL}/` : `${BASE_URL}/${mod}`);
+      const text = await res.text();
+      assert.ok(text.includes("后端写入") || text.includes("前端无执行入口"), `${mod} should use guarded backend write/audit wording`);
+      // "在线写入" as a standalone label (key-value pair) must not exist; substrings in longer blocked-change descriptions are OK
+      if (text.includes('"在线写入"') || text.includes("'在线写入'") || text.includes(": 在线写入") || text.includes(":在线写入")) {
+        assert.fail(`${mod} must not use 在线写入 as a standalone label`);
+      }
+    }
+  });
+
+  it("operator tasks and work event labels avoid frontend write-action wording", async () => {
+    const tasksRes = await fetch(`${BASE_URL}/api/operator/tasks`);
+    const tasksText = await tasksRes.text();
+    const constantsRes = await fetch(`${BASE_URL}/constants.js`);
+    const constantsText = await constantsRes.text();
+
+    assert.ok(tasksText.includes("后端写入守卫报告"), "operator tasks should label live readiness as backend write guard");
+    assert.ok(constantsText.includes("记录变更计划"), "work event tool label should describe a plan/audit, not direct writing");
+    assert.ok(!tasksText.includes("Live 写入就绪报告"), "operator tasks must not imply live write readiness");
+    assert.ok(!constantsText.includes("写入记录"), "work event label must not imply frontend record writing");
+  });
+
   it("all UI modules do not contain EXECUTE_LIVE_CANDIDATE_WRITES or /execute-writes", async () => {
     const modules = [
       "app.js",
@@ -1235,6 +1569,10 @@ describe("server API routes", () => {
       "agent-cards.js",
       "org-relay.js",
       "agent-relay-player.js",
+      "async-queue.js",
+      "analytics-report.js",
+      "server-data-readiness.js",
+      "agent-tool-trace.js",
     ];
     for (const mod of modules) {
       const res = await fetch(`${BASE_URL}/${mod}`);
@@ -1251,6 +1589,118 @@ describe("server API routes", () => {
     assert.ok(text.includes("run-dry-run"), "candidate-detail.js should reference run-dry-run");
     assert.ok(text.includes("run-provider-agent-demo"), "candidate-detail.js should reference run-provider-agent-demo");
     assert.ok(!text.includes("execute-writes"), "candidate-detail.js must not reference execute-writes");
+  });
+
+  it("graph-rag.js contains demo query presets and data source boundaries", async () => {
+    const res = await fetch(`${BASE_URL}/graph-rag.js`);
+    const text = await res.text();
+
+    // Must contain data source boundary labels
+    assert.ok(text.includes("Competition") || text.includes("全量镜像"), "graph-rag.js must reference Competition data source");
+    assert.ok(text.includes("5991"), "graph-rag.js must reference 5991 candidates");
+
+    // Must contain degradation messages
+    assert.ok(text.includes("未命中当前查询"), "graph-rag.js must show no-match degradation");
+    assert.ok(text.includes("全量镜像暂不可用"), "graph-rag.js must show unavailable degradation");
+
+    // Must NOT contain execute routes or sensitive fields
+    assert.ok(!text.includes("execute-report"), "graph-rag.js must not contain execute-report");
+    assert.ok(!text.includes("execute-writes"), "graph-rag.js must not contain execute-writes");
+    assert.ok(!text.includes("EXECUTE_LIVE"), "graph-rag.js must not contain EXECUTE_LIVE");
+    assert.ok(!text.includes("payload"), "graph-rag.js must not contain payload");
+    assert.ok(!text.includes("stdout"), "graph-rag.js must not contain stdout");
+    assert.ok(!text.includes("stderr"), "graph-rag.js must not contain stderr");
+  });
+
+  it("index.html contains RAG preset buttons", async () => {
+    const res = await fetch(`${BASE_URL}/`);
+    const text = await res.text();
+
+    // Must contain preset buttons
+    assert.ok(text.includes("graph-search-preset-btn"), "index.html must include preset buttons");
+    assert.ok(text.includes("AI 产品经理"), "index.html must include AI PM preset");
+    assert.ok(text.includes("机器学习"), "index.html must include ML preset");
+    assert.ok(text.includes("内容运营"), "index.html must include content ops preset");
+    assert.ok(text.includes("后端"), "index.html must include backend preset");
+
+    // Must contain RAG search section with Graph RAG label
+    assert.ok(text.includes("Graph RAG"), "index.html must include Graph RAG section");
+  });
+
+  it("graph-rag.js renders data source boundary and degradation in idle/empty states", async () => {
+    const res = await fetch(`${BASE_URL}/graph-rag.js`);
+    const text = await res.text();
+
+    // Data source boundary in idle state
+    assert.ok(text.includes("Competition") || text.includes("全量镜像"), "graph-rag.js must reference Competition in idle state");
+    assert.ok(text.includes("5991"), "graph-rag.js must show 5991 candidates in idle state");
+
+    // Degradation messages
+    assert.ok(text.includes("未命中当前查询"), "graph-rag.js must show no-match degradation");
+    assert.ok(text.includes("全量镜像暂不可用"), "graph-rag.js must show unavailable degradation");
+
+    // Search trace data source chip
+    assert.ok(text.includes("Competition Graph RAG 全量镜像"), "graph-rag.js trace must show Competition source");
+
+    // HTTP error handling: must check r.ok before parsing JSON
+    assert.ok(text.includes("!r.ok") || text.includes("!res.ok") || text.includes("throw new Error"), "graph-rag.js must check HTTP status before parsing JSON");
+  });
+
+  it("graph-rag.js checks HTTP status before parsing JSON in search and review", async () => {
+    const res = await fetch(`${BASE_URL}/graph-rag.js`);
+    const text = await res.text();
+    // Both search and review fetch paths must have r.ok guard
+    var searchIdx = text.indexOf("/api/competition/search");
+    var reviewIdx = text.indexOf("/api/competition/review");
+    assert.ok(searchIdx > 0, "graph-rag.js must reference competition search endpoint");
+    assert.ok(reviewIdx > 0, "graph-rag.js must reference competition review endpoint");
+  });
+
+  it("competition search preset: AI product manager returns relevant roles", async () => {
+    const res = await fetch(`${BASE_URL}/api/competition/search?q=` + encodeURIComponent("找一个AI产品经理，懂推荐系统和AIGC"));
+    assert.ok(res.ok, "search API should return 200");
+    const data = await res.json() as { candidates: Array<{ role: string; candidateId: string; matchScore: number }> };
+    assert.ok(Array.isArray(data.candidates), "should have candidates array");
+    if (data.candidates.length > 0) {
+      var first = data.candidates[0]!;
+      var topRole = String(first.role || "").toLowerCase();
+      // First result should be relevant: product manager, ai, or related
+      var isRelevant = topRole.includes("product") || topRole.includes("manager") || topRole.includes("ai") || topRole.includes("researcher");
+      assert.ok(isRelevant, "AI PM preset top result should be product/ai-related, got: " + topRole);
+    }
+  });
+
+  it("competition search preset: ML/data returns relevant roles", async () => {
+    const res = await fetch(`${BASE_URL}/api/competition/search?q=` + encodeURIComponent("找一个机器学习背景的数据分析师"));
+    assert.ok(res.ok, "search API should return 200");
+    const data = await res.json() as { candidates: Array<{ role: string; candidateId: string }> };
+    assert.ok(Array.isArray(data.candidates), "should have candidates array");
+    if (data.candidates.length > 0) {
+      var first = data.candidates[0]!;
+      var topRole = String(first.role || "").toLowerCase();
+      var isRelevant = topRole.includes("data") || topRole.includes("machine") || topRole.includes("engineer") || topRole.includes("scientist") || topRole.includes("analyst");
+      assert.ok(isRelevant, "ML preset top result should be data/ml-related, got: " + topRole);
+    }
+  });
+
+  it("competition search preset: backend/engineering returns relevant roles", async () => {
+    const res = await fetch(`${BASE_URL}/api/competition/search?q=` + encodeURIComponent("找一个后端开发或数据工程师"));
+    assert.ok(res.ok, "search API should return 200");
+    const data = await res.json() as { candidates: Array<{ role: string; candidateId: string }> };
+    assert.ok(Array.isArray(data.candidates), "should have candidates array");
+    if (data.candidates.length > 0) {
+      var first = data.candidates[0]!;
+      var topRole = String(first.role || "").toLowerCase();
+      var isRelevant = topRole.includes("engineer") || topRole.includes("developer") || topRole.includes("data") || topRole.includes("software");
+      assert.ok(isRelevant, "backend preset top result should be engineer-related, got: " + topRole);
+    }
+  });
+
+  it("competition search returns empty array for nonsense query, not error", async () => {
+    const res = await fetch(`${BASE_URL}/api/competition/search?q=xyznonexistentquery12345`);
+    assert.ok(res.ok, "search API should return 200 even for nonsense query");
+    const data = await res.json() as { candidates: unknown[] };
+    assert.ok(Array.isArray(data.candidates), "should have candidates array");
   });
 
   it("UI modules and index.html include source hints for static-only sections", async () => {

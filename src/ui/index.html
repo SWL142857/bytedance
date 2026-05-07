@@ -74,8 +74,30 @@
       </div>
     </section>
 
+    <!-- Block 0b: Server Data Readiness (read-only) -->
+    <section class="glass-panel anim-fade-up delay-1" style="padding:20px;" id="server-data-readiness-section">
+      <div class="audit-log-header">
+        <h3 class="audit-log-title">真实数据接入状态</h3>
+        <span class="section-source-hint">/api/competition/overview + /api/live/base-status</span>
+      </div>
+      <div id="server-readiness-body">
+        <div class="loading-pulse">正在检查数据接入状态</div>
+      </div>
+    </section>
+
+    <!-- Block 0c: Agent Tool Trace Timeline (read-only demo) -->
+    <section class="glass-panel anim-fade-up delay-1" style="padding:20px;" id="agent-tool-trace-section">
+      <div class="audit-log-header" id="agent-tool-trace-heading">
+        <h3 class="audit-log-title">Agent 工具轨迹</h3>
+        <span class="section-source-hint">Graph RAG + Agent Tool Use → 飞书承接 → 周报沉淀</span>
+      </div>
+      <div id="agent-tool-trace-body">
+        <div class="loading-pulse">正在加载工具轨迹</div>
+      </div>
+    </section>
+
     <!-- Block 1: Horizontal Pipeline Tabs -->
-    <section class="anim-fade-up delay-1">
+    <section class="anim-fade-up delay-1" hidden>
       <div class="pipeline-section-header">
         <div>
           <h2 class="pipeline-section-title">协作管线 (7-Agent Pipeline)</h2>
@@ -109,6 +131,14 @@
         <div class="candidate-search-box">
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
           <input type="text" class="candidate-search-input" id="candidate-search-input" placeholder="搜索候选人...">
+        </div>
+        <div class="graph-search-presets" id="graph-search-presets">
+          <span class="graph-search-presets-label">Demo 查询预设：</span>
+          <button type="button" class="graph-search-preset-btn" data-preset="找一个AI产品经理，懂推荐系统和AIGC">AI 产品经理</button>
+          <button type="button" class="graph-search-preset-btn" data-preset="找一个机器学习背景的数据分析师">机器学习/数据分析</button>
+          <button type="button" class="graph-search-preset-btn" data-preset="找一个内容运营或增长方向的人">内容运营/增长</button>
+          <button type="button" class="graph-search-preset-btn" data-preset="找一个后端开发或数据工程师">后端/数据工程</button>
+          <button type="button" class="graph-search-preset-btn" data-preset="找一个候选人，但需要人工复核判断">强匹配·需复核</button>
         </div>
       </div>
       <div id="graph-search-empty" class="graph-search-empty-state">
@@ -161,7 +191,7 @@
             <input id="reviewer-ad-hoc-role" class="deferred-input" type="text" placeholder="Role / 目标岗位，例如 Blockchain Developer" required>
             <textarea id="reviewer-ad-hoc-job-description" class="deferred-textarea" placeholder="Job_Description / 岗位描述" required></textarea>
             <textarea id="reviewer-ad-hoc-resume" class="deferred-textarea" placeholder="Resume / 简历正文" required></textarea>
-            <button type="submit" class="detail-action-btn detail-action-btn-warn">新建简历并开始复核</button>
+            <button type="submit" class="detail-action-btn detail-action-btn-warn">生成临时复核（不写飞书）</button>
           </form>
           <div id="reviewer-history-note" class="section-source-hint">Reviewer RAG 基于 competition 图谱快照和 LLM 进行判断；该复核报告只读展示，不写入飞书。</div>
         </div>
@@ -172,7 +202,7 @@
     </section>
 
     <!-- Block 4: Live Feishu Data -->
-    <section class="glass-panel anim-fade-up delay-3" style="padding:20px;" id="live-data-section">
+    <section class="glass-panel anim-fade-up delay-3" style="padding:20px;" id="live-data-section" hidden>
       <div class="audit-log-header">
         <h3 class="audit-log-title">飞书 Base 实时只读数据</h3>
         <span class="section-source-hint" id="live-data-hint">正在检查连接</span>
@@ -198,7 +228,7 @@
     </section>
 
     <!-- Block 5: Agent Relay Timeline -->
-    <section class="glass-panel wellfound-panel anim-fade-up delay-3" style="padding:32px 24px;" id="audit-log-section">
+    <section class="glass-panel wellfound-panel anim-fade-up delay-3" style="padding:32px 24px;" id="audit-log-section" hidden>
       <div class="audit-log-header">
         <h3 class="audit-log-title">Agent 接力时间线<!-- keep test anchor --><span style="display:none">最近活动</span></h3>
         <span class="section-source-hint">来自 /api/work-events 安全摘要</span>
@@ -210,7 +240,7 @@
     </section>
 
     <!-- Block 6: Operator Tasks -->
-    <section class="glass-panel anim-fade-up delay-3" style="padding:20px;" id="operator-tasks-section">
+    <section class="glass-panel anim-fade-up delay-3" style="padding:20px;" id="operator-tasks-section" hidden>
       <div class="audit-log-header">
         <h3 class="audit-log-title">操作员任务清单</h3>
         <span class="section-source-hint">当前为只读 · 真实执行须人工授权</span>
@@ -220,10 +250,36 @@
       </div>
     </section>
 
-    <section class="glass-panel anim-fade-up delay-3" style="padding:20px;" id="deferred-queue-section">
+    <!-- Block 6b: Analytics Report Plan (read-only) -->
+    <section class="glass-panel anim-fade-up delay-3" style="padding:20px;" id="analytics-report-section" hidden>
       <div class="audit-log-header">
-        <h3 class="audit-log-title">历史查询与一键同步</h3>
-        <span class="section-source-hint">搜索会自动保存 · 需要时一键同步</span>
+        <h3 class="audit-log-title">Analytics 周报计划（只读）</h3>
+        <span class="section-source-hint">仅生成计划，不执行写入 · 真实写入仍需后端双确认 + planNonce</span>
+      </div>
+      <div class="analytics-report-panel">
+        <div class="analytics-report-desc">
+          在此面板查看 Analytics 周报的写入计划。面板 <strong>只生成计划，不执行写入</strong>。真实写入到飞书 Reports + Agent Runs 需要后端双确认后端双确认 + planNonce TOCTOU guard，无法从前端触发。
+        </div>
+        <div class="analytics-report-inputs">
+          <div class="analytics-report-input-row">
+            <label class="analytics-report-label">周期开始（可选）</label>
+            <input type="date" class="analytics-report-date-input" id="analytics-period-start" placeholder="YYYY-MM-DD">
+          </div>
+          <div class="analytics-report-input-row">
+            <label class="analytics-report-label">周期结束（可选）</label>
+            <input type="date" class="analytics-report-date-input" id="analytics-period-end" placeholder="YYYY-MM-DD">
+          </div>
+        </div>
+        <button type="button" class="detail-action-btn" id="analytics-generate-btn">生成报告计划</button>
+        <div id="analytics-report-body" class="analytics-report-result"></div>
+        <div class="analytics-report-boundary-note">只读 / 不执行写入 / 真实写入仍需后端双确认 + planNonce</div>
+      </div>
+    </section>
+
+    <section class="glass-panel anim-fade-up delay-3" style="padding:20px;" id="deferred-queue-section" hidden>
+      <div class="audit-log-header">
+        <h3 class="audit-log-title">历史查询与本地暂存处理</h3>
+        <span class="section-source-hint">搜索会自动保存 · 批处理只更新本地快照，不写飞书</span>
       </div>
       <div class="deferred-grid">
         <div class="deferred-panel">
@@ -233,12 +289,12 @@
         </div>
 
         <div class="deferred-panel">
-          <div class="deferred-panel-title">一键同步数据</div>
-          <p class="deferred-panel-hint">需要时再统一同步暂存数据。同步阶段才会集中处理待同步项。</p>
-          <button type="button" class="detail-action-btn detail-action-btn-warn" id="deferred-process-btn">一键同步数据</button>
+          <div class="deferred-panel-title">处理本地暂存</div>
+          <p class="deferred-panel-hint">需要时再统一处理暂存数据；这里只更新本地运行快照，不会写入飞书 Base。</p>
+          <button type="button" class="detail-action-btn detail-action-btn-warn" id="deferred-process-btn">处理本地暂存</button>
           <div id="deferred-process-result" class="detail-zone-result"></div>
           <div id="deferred-queue-summary"></div>
-          <div id="deferred-queue-list"><div class="loading-pulse">正在加载同步摘要</div></div>
+          <div id="deferred-queue-list"><div class="loading-pulse">正在加载暂存摘要</div></div>
         </div>
       </div>
     </section>
@@ -308,7 +364,7 @@
         <div class="glass-card card-body" id="drawer-pre-api-freeze"></div>
       </div>
       <div class="console-drawer-section">
-        <div class="console-drawer-section-label">在线写入就绪</div>
+        <div class="console-drawer-section-label">后端写入守卫</div>
         <div class="glass-card card-body" id="drawer-live-readiness"></div>
       </div>
       <div class="console-drawer-section">

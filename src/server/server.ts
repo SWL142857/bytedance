@@ -77,7 +77,7 @@ import {
   buildCompetitionSearchResult,
   buildCompetitionCandidateReview,
 } from "../runtime/competition-demo-view-model.js";
-import { runCompetitionLiveSearch } from "../runtime/competition-live-search.js";
+import { runCompetitionLiveSearch, enrichCompetitionQuery } from "../runtime/competition-live-search.js";
 import { runCompetitionLiveReview } from "../runtime/competition-live-review.js";
 import { runCompetitionAdHocReview } from "../runtime/competition-live-review.js";
 
@@ -284,18 +284,19 @@ async function handleApi(
 
     if (url.pathname === "/api/competition/search" && req.method === "GET") {
       const query = url.searchParams.get("q") ?? "";
+      const enrichedQuery = query.trim() ? enrichCompetitionQuery(query) : query;
       const competitionOptions = getCompetitionDemoOptions();
       let result;
       if (query.trim()) {
         try {
-          result = await runCompetitionLiveSearch(query, {
+          result = await runCompetitionLiveSearch(enrichedQuery, {
             competitionRoot: competitionOptions.competitionRoot ?? "/data/competition",
           });
         } catch {
-          result = buildCompetitionSearchResult(query, competitionOptions);
+          result = buildCompetitionSearchResult(enrichedQuery, competitionOptions);
         }
       } else {
-        result = buildCompetitionSearchResult(query, competitionOptions);
+        result = buildCompetitionSearchResult(enrichedQuery, competitionOptions);
       }
       jsonResponse(res, result);
       return;

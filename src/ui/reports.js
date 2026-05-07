@@ -73,7 +73,7 @@ export const REPORT_DRAWER_MAP = {
   "release-gate-content": { healthKey: "releaseGate", drawerId: "drawer-release-gate", title: "交付检查" },
   "api-audit-content": { healthKey: "apiAudit", drawerId: "drawer-api-audit", title: "API 边界审计" },
   "pre-api-freeze-content": { healthKey: "preApiFreeze", drawerId: "drawer-pre-api-freeze", title: "架构冻结" },
-  "live-readiness-content": { healthKey: "liveReadiness", drawerId: "drawer-live-readiness", title: "在线写入就绪" },
+  "live-readiness-content": { healthKey: "liveReadiness", drawerId: "drawer-live-readiness", title: "后端写入守卫" },
   "provider-readiness-content": { healthKey: "providerReadiness", drawerId: "drawer-provider-readiness", title: "就绪状态" },
   "provider-smoke-content": { healthKey: "providerSmoke", drawerId: "drawer-provider-smoke", title: "连通测试" },
   "provider-agent-demo-content": { healthKey: "providerAgentDemo", drawerId: "drawer-provider-agent-demo", title: "Agent 演示" },
@@ -172,7 +172,7 @@ export function renderLiveReadiness(data) {
   const drawerEl = document.getElementById("drawer-live-readiness");
   if (!drawerEl) return;
 
-  let html = '<div class="card-header"><span class="card-header-dot"></span>在线写入就绪</div>';
+  let html = '<div class="card-header"><span class="card-header-dot"></span>后端写入守卫</div>';
   html += '<div class="card-body">';
   html += '<div class="readiness-hero">';
   html += '<div class="readiness-status ' + (data.ready ? 'ready' : 'not-ready') + '">' +

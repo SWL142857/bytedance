@@ -110,9 +110,11 @@ export function renderWorkEvents(events) {
     html += '</div>';
     html += '</div>';
 
-    // Aside: time + link
+    // Aside: time + link. Demo/blocked events show "演示快照" to avoid stale relative times.
+    var isDemoEvent = e.execution_mode === "dry_run" || e.execution_mode === "blocked" || (e.link && e.link.link_status === "demo_only");
+    var timeLabel = isDemoEvent ? "演示快照" : relativeTime(e.created_at);
     html += '<div class="relay-aside">';
-    html += '<span class="relay-time">' + esc(relativeTime(e.created_at)) + '</span>';
+    html += '<span class="relay-time">' + esc(timeLabel) + '</span>';
     if (e.link) {
       if (e.link.available) {
         html += '<button class="relay-link-btn" data-link-id="' + esc(e.link.link_id) + '">' + esc(e.link.link_label || "打开记录") + '</button>';

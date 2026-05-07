@@ -9,7 +9,7 @@ import { AGENT_NODES, RETIRED_AGENT_NAMES } from "./constants.js";
 function statusLabel(status) {
   if (status === "工作中") return "活跃";
   if (status === "需要人工处理") return "需确认";
-  if (status === "阻塞") return "阻塞";
+  if (status === "阻塞") return "等待人工确认";
   return "待命";
 }
 
@@ -72,7 +72,7 @@ export function renderOrgRelay(orgData, eventsData) {
   html += '<div class="org-relay-summary">';
   html += '<div class="org-relay-summary-item"><span class="org-relay-summary-val active">' + activeCount + '</span><span class="org-relay-summary-lbl">活跃 Agent</span></div>';
   html += '<div class="org-relay-summary-item"><span class="org-relay-summary-val human">' + humanCount + '</span><span class="org-relay-summary-lbl">待人工确认</span></div>';
-  html += '<div class="org-relay-summary-item"><span class="org-relay-summary-val blocked">' + blockedCount + '</span><span class="org-relay-summary-lbl">阻塞</span></div>';
+  html += '<div class="org-relay-summary-item"><span class="org-relay-summary-val blocked">' + blockedCount + '</span><span class="org-relay-summary-lbl">守卫已生效</span></div>';
   html += '<div class="org-relay-summary-item"><span class="org-relay-summary-val idle">' + idleCount + '</span><span class="org-relay-summary-lbl">待命中</span></div>';
   html += '</div>';
 

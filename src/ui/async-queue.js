@@ -8,8 +8,8 @@ const KIND_LABELS = {
 };
 
 const STATUS_LABELS = {
-  pending: "待同步",
-  processed: "已同步",
+  pending: "待处理",
+  processed: "已处理",
   failed: "失败",
 };
 
@@ -51,7 +51,7 @@ function renderQueueSummary(data) {
   el.innerHTML =
     '<div class="deferred-summary-grid">' +
     '<div class="deferred-summary-card"><span class="deferred-summary-value">' + esc(String(queryCount)) + '</span><span class="deferred-summary-label">历史查询</span></div>' +
-    '<div class="deferred-summary-card"><span class="deferred-summary-value">' + esc(String(syncableCount)) + '</span><span class="deferred-summary-label">待同步数据</span></div>' +
+    '<div class="deferred-summary-card"><span class="deferred-summary-value">' + esc(String(syncableCount)) + '</span><span class="deferred-summary-label">待处理暂存</span></div>' +
     '<div class="deferred-summary-card"><span class="deferred-summary-value">' + esc(String(pending)) + '</span><span class="deferred-summary-label">总待处理</span></div>' +
     '<div class="deferred-summary-card"><span class="deferred-summary-value">' + esc(String(data.processed || 0)) + '</span><span class="deferred-summary-label">已处理</span></div>' +
     "</div>";
@@ -95,7 +95,7 @@ function renderSyncList(data) {
   }
   var syncable = data.items.filter(function (item) { return item.kind !== "search_query"; }).slice(0, 6);
   if (!syncable.length) {
-    el.innerHTML = '<div class="live-card-empty">当前没有需要同步的数据项。</div>';
+    el.innerHTML = '<div class="live-card-empty">当前没有需要处理的暂存数据项。</div>';
     return;
   }
 
@@ -141,17 +141,17 @@ function bindProcessButton() {
   btn.addEventListener("click", function () {
     var resultEl = document.getElementById("deferred-process-result");
     btn.disabled = true;
-    btn.textContent = "同步中...";
+    btn.textContent = "处理中...";
     if (resultEl) {
-      resultEl.innerHTML = '<div class="detail-zone-loading">正在同步暂存数据...</div>';
+      resultEl.innerHTML = '<div class="detail-zone-loading">正在处理本地暂存数据...</div>';
     }
     postJson("/api/deferred-queue/process", {})
       .then(function (data) {
         if (resultEl) {
           var extra = data.snapshotUpdated
-            ? '<div class="detail-result-note">最新运行快照已更新，主面板将自动刷新。</div>'
+            ? '<div class="detail-result-note">最新本地运行快照已更新，主面板将自动刷新；未写入飞书 Base。</div>'
             : "";
-          resultEl.innerHTML = '<div class="detail-result-ok">' + esc(data.safeSummary || "同步完成。") + "</div>" + extra;
+          resultEl.innerHTML = '<div class="detail-result-ok">' + esc(data.safeSummary || "处理完成。") + "</div>" + extra;
         }
         loadDeferredQueue().then(function () {
           if (window._hireloopReloadAfterRun && data.snapshotUpdated) {
@@ -161,12 +161,12 @@ function bindProcessButton() {
       })
       .catch(function (err) {
         if (resultEl) {
-          resultEl.innerHTML = '<div class="detail-result-error">' + esc(err.message || "同步失败") + "</div>";
+          resultEl.innerHTML = '<div class="detail-result-error">' + esc(err.message || "处理失败") + "</div>";
         }
       })
       .finally(function () {
         btn.disabled = false;
-        btn.textContent = "一键同步数据";
+        btn.textContent = "处理本地暂存";
       });
   });
 }

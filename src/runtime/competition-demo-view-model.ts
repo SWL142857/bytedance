@@ -689,11 +689,26 @@ function computeStructuredCandidateSearchDetail(
 
   const fuzzyTerms = intent.normalizedTokens.filter((token) => !intent.exactRequirements.includes(token));
   const matchedTokens = [...matchedSkills, ...matchedDegrees.map(degreeLabel)];
+
+  // Role boost: if candidate's role contains an English term from the query,
+  // weight it heavily (+1.8) so Chinese presets can discriminate by role.
+  // Without this, generic English terms match many resumes equally.
+  const candidateRole = (candidate.candidate.sourceMetadata?.role ?? "").toLowerCase();
+  var roleBoostApplied = false;
   for (const token of fuzzyTerms) {
-    if (containsWholeTerm(searchableText, token)) {
+    if (containsWholeTerm(candidateRole, token) && token.length >= 3) {
+      score += 1.8;
       matchedTokens.push(token);
-      score += 0.15;
-      contributions.push({ source: "role", score: 0.15, reason: `文本命中：${token}` });
+      contributions.push({ source: "role", score: 1.8, reason: `岗位对齐：${token}` });
+      roleBoostApplied = true;
+    }
+  }
+
+  for (const token of fuzzyTerms) {
+    if (containsWholeTerm(searchableText, token) && !matchedTokens.includes(token)) {
+      matchedTokens.push(token);
+      score += roleBoostApplied ? 0.08 : 0.15;
+      contributions.push({ source: "role", score: roleBoostApplied ? 0.08 : 0.15, reason: `文本命中：${token}` });
     }
   }
 

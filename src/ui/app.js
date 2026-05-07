@@ -21,6 +21,9 @@ import {
 import { loadLiveData } from "./live-records.js";
 import { initCandidateDetail } from "./candidate-detail.js";
 import { initDeferredQueueUi } from "./async-queue.js";
+import { initAnalyticsReportPanel } from "./analytics-report.js";
+import { initServerDataReadiness } from "./server-data-readiness.js";
+import { initAgentToolTrace } from "./agent-tool-trace.js";
 
 // Expose for test backward compat + runtime snapshot refresh
 window._hireloopReloadAfterRun = function () {
@@ -97,6 +100,9 @@ function load() {
   loadLiveData();
   initCandidateDetail();
   initDeferredQueueUi();
+  initServerDataReadiness();
+  initAgentToolTrace();
+  initAnalyticsReportPanel();
 
   // Feishu header status
   fetch("/api/live/base-status")

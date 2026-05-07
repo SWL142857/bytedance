@@ -167,19 +167,21 @@ export function loadLiveData() {
           );
         }).catch(function () {
           const grid = document.getElementById("live-grid");
-          if (grid) grid.innerHTML = errorHtml();
+          if (grid) grid.innerHTML =
+            '<div class="live-card-empty" style="grid-column:1/-1">Base 数据读取失败，面板已降级到只读本地模式</div>';
         });
       } else {
         const grid = document.getElementById("live-grid");
+        var reasonHint = (data && data.readiness === "partial") ? "（读取受限，已降级到本地数据）" : "";
         if (grid) grid.innerHTML =
-          '<div class="live-card-empty" style="grid-column:1/-1">飞书连接未就绪，实时数据暂不可用</div>';
+          '<div class="live-card-empty" style="grid-column:1/-1">飞书连接未就绪，实时数据暂不可用' + reasonHint + '</div>';
       }
     })
     .catch(function () {
       renderLiveBaseStatus(null);
       const grid = document.getElementById("live-grid");
       if (grid) grid.innerHTML =
-        '<div class="live-card-empty" style="grid-column:1/-1">飞书连接未就绪，实时数据暂不可用</div>';
+        '<div class="live-card-empty" style="grid-column:1/-1">Base 数据读取失败，面板已降级</div>';
     });
 }
 

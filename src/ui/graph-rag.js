@@ -215,15 +215,19 @@ export function renderCandidateGrid(searchData) {
   renderSearchTrace(searchData);
 
   if (!candidates.length) {
-    grid.innerHTML = '<div class="graph-canvas-empty" style="grid-column:1/-1">无搜索结果</div>';
+    grid.innerHTML = '<div class="graph-canvas-empty" style="grid-column:1/-1">' +
+      '<div class="graph-search-empty-title">未命中当前查询</div>' +
+      '<div class="graph-search-empty-text">当前查询未在 Competition Graph RAG 全量镜像中命中候选人。可尝试调整关键词，或点击上方 Demo 查询预设。</div>' +
+      '<div class="graph-search-empty-source">已搜索 5991 位候选人，未匹配到与 "' + esc(searchData && searchData.query ? searchData.query : "") + '" 相关的结果</div>' +
+      '</div>';
     selectedCandidateId = null;
     clearGraphMeta();
     var canvas = document.getElementById("graph-canvas");
     if (canvas) canvas.innerHTML = '<div class="graph-canvas-empty">当前查询没有可复核候选人</div>';
     var emptyTitle = document.getElementById("queue-title");
     var emptySubtitle = document.getElementById("queue-subtitle");
-    if (emptyTitle) emptyTitle.textContent = "Graph RAG 查询";
-    if (emptySubtitle) emptySubtitle.textContent = "当前查询没有命中候选人，可调整关键词后重试";
+    if (emptyTitle) emptyTitle.textContent = "Graph RAG 查询 · 未命中";
+    if (emptySubtitle) emptySubtitle.textContent = "当前查询没有命中候选人，可调整关键词或使用 Demo 预设重试";
     return;
   }
 
@@ -308,9 +312,9 @@ function switchGraphScene(scene) {
   if (reviewerSection) reviewerSection.hidden = currentGraphScene !== "reviewer";
   var searchOnlySections = document.querySelectorAll("#deferred-queue-section");
   for (var so = 0; so < searchOnlySections.length; so++) {
-    searchOnlySections[so].hidden = currentGraphScene !== "search";
+    searchOnlySections[so].hidden = true;
   }
-  var clutterSections = document.querySelectorAll("#live-data-section, #org-relay-section, #audit-log-section, #operator-tasks-section");
+  var clutterSections = document.querySelectorAll("#live-data-section, #audit-log-section, #operator-tasks-section");
   for (var c = 0; c < clutterSections.length; c++) {
     clutterSections[c].hidden = true;
   }
@@ -390,7 +394,10 @@ export function loadGraphReview(candidateId) {
   var activeQuery = queryInput ? queryInput.value.trim() : "";
 
   fetch("/api/competition/review?candidateId=" + encodeURIComponent(candidateId) + "&q=" + encodeURIComponent(activeQuery))
-    .then(function (r) { return r.json(); })
+    .then(function (r) {
+      if (!r.ok) throw new Error("Graph RAG review returned " + r.status);
+      return r.json();
+    })
     .then(function (reviewData) {
       if (reviewData.error) {
         canvas.innerHTML = '<div class="graph-canvas-empty">' + esc(reviewData.error) + '</div>';
@@ -644,6 +651,18 @@ export function initGraphRagSearch(initialQuery) {
       setGraphSearchIdleState();
     }
   });
+
+  // Wire preset buttons
+  var presetBtns = document.querySelectorAll(".graph-search-preset-btn");
+  for (var p = 0; p < presetBtns.length; p++) {
+    presetBtns[p].addEventListener("click", function () {
+      var query = this.getAttribute("data-preset") || "";
+      if (input && query) {
+        input.value = query;
+        doGraphSearch(query);
+      }
+    });
+  }
 }
 
 function loadReviewerScenario(candidateId) {
@@ -714,17 +733,24 @@ function doGraphSearch(query) {
   if (grid) grid.innerHTML = '<div class="loading-pulse" style="grid-column:1/-1">正在检索 Graph RAG...</div>';
 
   fetch("/api/competition/search?q=" + encodeURIComponent(query))
-    .then(function (r) { return r.json(); })
+    .then(function (r) {
+      if (!r.ok) throw new Error("Graph RAG search returned " + r.status);
+      return r.json();
+    })
     .then(function (data) {
       renderCandidateGrid(data);
       saveSearchHistory(query, data);
     })
     .catch(function () {
-      if (grid) grid.innerHTML = '<div class="graph-canvas-empty" style="grid-column:1/-1">Graph RAG 检索失败</div>';
+      if (grid) grid.innerHTML = '<div class="graph-canvas-empty" style="grid-column:1/-1">' +
+        '<div class="graph-search-empty-title">Graph RAG 全量镜像暂不可用</div>' +
+        '<div class="graph-search-empty-text">Competition Graph RAG 服务暂时不可用。Feishu Base 演示样本不受影响，但全量智能检索需等待 Competition 数据恢复。</div>' +
+        '<div class="graph-search-empty-source">已降级：可尝试点击 Demo 查询预设，或稍后重试</div>' +
+        '</div>';
       selectedCandidateId = null;
       clearGraphMeta();
       var canvas = document.getElementById("graph-canvas");
-      if (canvas) canvas.innerHTML = '<div class="graph-canvas-empty">Graph RAG 检索失败</div>';
+      if (canvas) canvas.innerHTML = '<div class="graph-canvas-empty">Graph RAG 检索失败，已降级到只读演示面板</div>';
     });
 }
 
@@ -740,8 +766,8 @@ function setGraphSearchIdleState() {
   var empty = document.getElementById("graph-search-empty");
   var zone = document.getElementById("graph-rag-zone");
   var canvas = document.getElementById("graph-canvas");
-  if (title) title.textContent = "Graph RAG 查询";
-  if (subtitle) subtitle.textContent = "输入自然语言查询后，再展示候选人队列与深度图谱分析";
+  if (title) title.textContent = "Graph RAG 查询 · Competition 全量镜像";
+  if (subtitle) subtitle.textContent = "输入自然语言查询或点击上方 Demo 预设 · 5991 candidates / 23961 evidence / 38 roles";
   if (trace) {
     trace.hidden = true;
     trace.innerHTML = "";
@@ -750,7 +776,12 @@ function setGraphSearchIdleState() {
     grid.hidden = true;
     grid.innerHTML = "";
   }
-  if (empty) empty.hidden = false;
+  if (empty) {
+    empty.hidden = false;
+    empty.innerHTML = '<div class="graph-search-empty-title">等待查询</div>' +
+      '<div class="graph-search-empty-text">输入岗位、技能、学历或其他自然语言条件后按回车，或点击上方 Demo 查询预设按钮。</div>' +
+      '<div class="graph-search-empty-source">数据源：Competition Graph RAG 全量镜像（5991 candidates / 23961 evidence / 38 roles）<br>Feishu Base 仅承载业务演示样本，Graph RAG 负责全量智能检索</div>';
+  }
   if (zone) zone.hidden = true;
   if (canvas) canvas.innerHTML = '<div class="graph-canvas-empty">← 点击上方候选人卡片以查看图谱深度分析</div>';
 }
@@ -782,7 +813,7 @@ function renderSearchTrace(searchData) {
   html += '<div class="graph-search-trace-summary">' + esc(searchData.safeSummary || "") + '</div>';
   html += '</div>';
   html += '<div class="graph-search-trace-stats">';
-  html += '<span class="graph-search-chip">数据源：本地 Competition 数据集</span>';
+  html += '<span class="graph-search-chip">数据源：Competition Graph RAG 全量镜像（5991 candidates）</span>';
   html += '<span class="graph-search-chip">模式：' + esc(trace.mode === "query_search" ? "查询检索" : "默认推荐") + '</span>';
   html += '<span class="graph-search-chip">候选人池：' + esc(String(trace.candidateCountBeforeFilter || 0)) + '</span>';
   html += '<span class="graph-search-chip">返回：' + esc(String(trace.candidateCountAfterFilter || 0)) + '</span>';

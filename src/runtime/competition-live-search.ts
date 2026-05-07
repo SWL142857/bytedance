@@ -87,8 +87,7 @@ export async function runCompetitionLiveSearch(
   query: string,
   options: CompetitionLiveSearchOptions,
 ): Promise<CompetitionSearchResult> {
-  const enrichedQuery = enrichCompetitionQuery(query);
-  const compact = await runPythonSearch(enrichedQuery, options);
+  const compact = await runPythonSearch(query, options);
   const overview = buildCompetitionDemoOverview({ competitionRoot: options.competitionRoot });
   const reviewCache = new Map<string, ReturnType<typeof buildCompetitionCandidateReview>>();
   const llmCandidateMap = new Map(
@@ -243,18 +242,77 @@ function runPythonSearch(
   });
 }
 
-function enrichCompetitionQuery(query: string): string {
-  let enriched = query;
+// Chinese→English role synonym expansion for competition search.
+// The competition dataset uses English role labels; Chinese queries need
+// targeted expansion so the search can discriminate between candidates.
+// Each pattern adds only the most relevant English role terms for that category.
+var ROLE_SYNONYM_MAP: Array<{ pattern: RegExp; terms: string }> = [
+  // AI / Product — primary: product manager, ai researcher
+  { pattern: /产品经理|产品总监|产品负责人/, terms: "product manager" },
+  { pattern: /AI|AIGC|大模型|LLM/, terms: "ai researcher" },
+  { pattern: /推荐系统|推荐算法/, terms: "machine learning engineer" },
+  // Data / Analytics
+  { pattern: /数据分析|数据分析师|BI|商业智能|数据挖掘/, terms: "data analyst" },
+  { pattern: /数据科学|数据科学家/, terms: "data scientist" },
+  { pattern: /数据工程|数据工程师|ETL|数据管道|数据仓库/, terms: "data engineer" },
+  { pattern: /机器学习|深度学习|算法工程师/, terms: "machine learning engineer" },
+  // Engineering
+  { pattern: /后端|后台|服务端|后端开发/, terms: "software engineer" },
+  { pattern: /前端|web.*开发|移动端|Android|iOS|React|Vue|Flutter/, terms: "software engineer" },
+  { pattern: /全栈|full.?stack/, terms: "software engineer" },
+  // Content / Growth / Marketing
+  { pattern: /内容运营|内容策略|内容编辑|新媒体|自媒体|公众号|文案/, terms: "digital marketing" },
+  { pattern: /运营|增长|用户增长|用户运营|社群运营|活动运营/, terms: "e-commerce specialist" },
+  // Design
+  { pattern: /UI|UX|界面设计|用户体验|交互设计|视觉设计/, terms: "ui designer" },
+  // HR
+  { pattern: /人事|HR|人力|招聘/, terms: "human resources specialist" },
+  // Review (for "强匹配·需复核" preset)
+  { pattern: /人工复核|人工判断|需要复核|需要判断/, terms: "review_needed human review" },
+  // Generic fallback for any search — broad enough to match but narrow enough to discriminate
+  { pattern: /候选|找|招|招聘|推荐/, terms: "software engineer" },
+];
+
+export function enrichCompetitionQuery(query: string): string {
+  var enriched = query;
+  var addedTerms: string[] = [];
+
+  // Degree synonyms
   if (/本科/.test(query) && !/bachelor/i.test(query)) {
-    enriched += " bachelor undergraduate";
+    addedTerms.push("bachelor undergraduate");
   }
   if (/硕士/.test(query) && !/master/i.test(query)) {
-    enriched += " master graduate";
+    addedTerms.push("master graduate");
   }
   if (/博士/.test(query) && !/phd|doctorate/i.test(query)) {
-    enriched += " phd doctorate";
+    addedTerms.push("phd doctorate");
   }
-  return enriched;
+
+  // Role synonyms: match Chinese patterns → add English role terms
+  for (var i = 0; i < ROLE_SYNONYM_MAP.length; i++) {
+    var entry = ROLE_SYNONYM_MAP[i]!;
+    if (entry.pattern.test(query)) {
+      // Only add terms not already in the query
+      var existingLower = enriched.toLowerCase();
+      var terms = entry.terms.split(" ");
+      var newTerms: string[] = [];
+      for (var j = 0; j < terms.length; j++) {
+        var term = terms[j]!;
+        if (existingLower.indexOf(term) === -1) {
+          newTerms.push(term);
+        }
+      }
+      if (newTerms.length > 0) {
+        addedTerms.push(newTerms.join(" "));
+      }
+    }
+  }
+
+  if (addedTerms.length > 0) {
+    enriched += " " + addedTerms.join(" ").replace(/\s+/g, " ").trim();
+  }
+
+  return enriched.trim();
 }
 
 function normalizePythonSearchScore(score: number): number {
